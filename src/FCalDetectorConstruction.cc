@@ -1,7 +1,4 @@
 /*
----
-(Original Comments:)
-
 This is the source code of the detector constuction.
 
 Author: Zhaoyuan Cui
@@ -12,13 +9,12 @@ This code generates the geometry of FCal1, including liguid argon gaps and rods.
 Arrangement of the rods is accomplished by following the actual region 
 arrangement. Sensitive detector should be provided by the user for his or her 
 own purpose.
----
 
-Edited by Anson Kost with the help of Professor John Rutherfoord. Spring 2019.
+-
+
+Edited by Anson Kost with the help of Professor John Rutherfoord, May 2019.
 
 */
-
-#include <map>
 
 #include "FCalDetectorConstruction.hh"
 #include "FCalEmCalorimeterSD.hh"
@@ -37,6 +33,7 @@ Edited by Anson Kost with the help of Professor John Rutherfoord. Spring 2019.
 #include "G4PVReplica.hh"
 
 #include "G4SDManager.hh"
+
 #include "G4VisAttributes.hh"
 #include "G4Colour.hh"
 
@@ -48,22 +45,33 @@ Edited by Anson Kost with the help of Professor John Rutherfoord. Spring 2019.
 #include "G4SubtractionSolid.hh"
 #include "G4UserLimits.hh"
 
+#include <map>
 
-///|////////////////////////////////////////////////////////////
-//|| Constructor and destructor.
-///|////////////////////////////////////////////////////////////
+
+//// Constructor and destructor.
+
 FCalDetectorConstruction::FCalDetectorConstruction() 
 	: fpWorldLogical(0), fpWorldPhysical(0) {}
 
 FCalDetectorConstruction::~FCalDetectorConstruction() {}
 
 
-///|////////////////////////////////////////////////////////////
-//|| Sensitive detectors.
-///|////////////////////////////////////////////////////////////
+// "Invoked in the master thread."
+// Instantiates necessary materials and volumes.
+G4VPhysicalVolume* FCalDetectorConstruction::Construct()
+{
+	ConstructMaterials();
+	SetupGeometry();
+	return fpWorldPhysical;
+}
+
+
+///|////////////////////////////////////////////////////////////////////////////
+//|| Sensitive Detectors
+///|////////////////////////////////////////////////////////////////////////////
 void FCalDetectorConstruction::ConstructSDandField()
 {
-	// Sensitive detectors
+	// Make the sensitive detector.
 	G4String trackerChamberSDname = "FCalSD";
 	FCalEmCalorimeterSD* aTrackerSD = new FCalEmCalorimeterSD(
 		trackerChamberSDname, 
@@ -71,15 +79,14 @@ void FCalDetectorConstruction::ConstructSDandField()
 	);
 	G4SDManager::GetSDMpointer()->AddNewDetector(aTrackerSD);
 
-	// Setting aTrackerSD to all logical volumes with the same name of 
-    // "Gap_Logical".
+	// Make all logical volumes with the name "Gap_Logical" sensitive.
 	SetSensitiveDetector("Gap_Logical", aTrackerSD, true);
 }
 
 
-///|////////////////////////////////////////////////////////////
-//|| Materials and elements.
-///|////////////////////////////////////////////////////////////
+///|////////////////////////////////////////////////////////////////////////////
+//|| Materials and Elements
+///|////////////////////////////////////////////////////////////////////////////
 void FCalDetectorConstruction::ConstructMaterials()
 {
 	G4String symbol;
@@ -87,25 +94,7 @@ void FCalDetectorConstruction::ConstructMaterials()
 	G4int ncomponents, nisotopes, natoms;
 	G4double fractionmass;
 
-	// Materials
-	new G4Material(
-		"Copper", z = 29., a = 63.546 * CLHEP::g / CLHEP::mole,
-		density = 8.96 * CLHEP::g / CLHEP::cm3
-	);
-	new G4Material(
-		"LAr", z = 18., a = 39.948 * CLHEP::g / CLHEP::mole, 
-		density = 1.396 * CLHEP::g / CLHEP::cm3
-	);
-	new G4Material(
-		"Tungsten", z = 74., a = 183.84 * CLHEP::g / CLHEP::mole, 
-		density = 19.25 * CLHEP::g / CLHEP::cm3
-	);
-	new G4Material(
-		"Titanium", z = 22., a = 47.867 * CLHEP::g / CLHEP::mole, 
-		density = 4.506 * CLHEP::g / CLHEP::mole
-	);
-
-	// Elements
+	//// Elements
 	G4Element* N = new G4Element(
 		"Nitrogen", symbol = "N", z = 7., a = 14.01 * CLHEP::g / CLHEP::mole
 	);
@@ -119,21 +108,23 @@ void FCalDetectorConstruction::ConstructMaterials()
 		"Carbon", symbol = "C", z = 6., a = 12 * CLHEP::g / CLHEP::mole
 	);
 
-	// Air
+    //// Materials 
+
+	//// Air
 	G4Material* air = new G4Material(
 		"Air", density = 1.290 * CLHEP::mg / CLHEP::cm3, ncomponents = 2
 	);
 	air->AddElement(N, fractionmass = 0.7);
 	air->AddElement(O, fractionmass = 0.3);
 
-	// Vacuum
+	//// Vacuum
 	G4Material* vacuum = new G4Material(
 		"Vacuum", density = 1.e-5 * CLHEP::g / CLHEP::cm3,
 		ncomponents = 1, kStateGas, CLHEP::STP_Temperature,
 		2.e-2 * CLHEP::bar);
 	vacuum->AddMaterial(air, fractionmass = 1.);
 
-	// PEEK
+	//// PEEK
 	G4Material* PEEK = new G4Material(
 		"PEEK", density = 1.32 * CLHEP::g / CLHEP::cm3, ncomponents = 3
 	);
@@ -141,40 +132,38 @@ void FCalDetectorConstruction::ConstructMaterials()
 	PEEK->AddElement(H, natoms = 12);
 	PEEK->AddElement(O, natoms = 3);
 
+    //// Other Materials
+    new G4Material(
+        "Copper", z = 29., a = 63.546 * CLHEP::g / CLHEP::mole,
+        density = 8.96 * CLHEP::g / CLHEP::cm3
+    );
+    new G4Material(
+        "LAr", z = 18., a = 39.948 * CLHEP::g / CLHEP::mole,
+        density = 1.396 * CLHEP::g / CLHEP::cm3
+    );
+    new G4Material(
+        "Tungsten", z = 74., a = 183.84 * CLHEP::g / CLHEP::mole,
+        density = 19.25 * CLHEP::g / CLHEP::cm3
+    );
+    new G4Material(
+        "Titanium", z = 22., a = 47.867 * CLHEP::g / CLHEP::mole,
+        density = 4.506 * CLHEP::g / CLHEP::mole
+    );
+
 	// Print material table.
 	G4cout << *(G4Material::GetMaterialTable()) << G4endl;
 }
 
 
-///|////////////////////////////////////////////////////////////
-//|| "Invoked in the master thread."
-//|| Instantiates necessary materials and volumes.
-///|////////////////////////////////////////////////////////////
-G4VPhysicalVolume* FCalDetectorConstruction::Construct()
-{
-	ConstructMaterials();
-	SetupGeometry();
-	return fpWorldPhysical;
-}
-
-
-///|////////////////////////////////////////////////////////////
-//|| Create the detector and its geometry.
-///|////////////////////////////////////////////////////////////
+///|////////////////////////////////////////////////////////////////////////////
+//|| Create Detector Geometry
+///|////////////////////////////////////////////////////////////////////////////
 void FCalDetectorConstruction::SetupGeometry()
 {
-	// Get the materials defined earlier
-	G4Material* air = G4Material::GetMaterial("Air");
-	G4Material* vacuum = G4Material::GetMaterial("Vacuum");
-	G4Material* copper = G4Material::GetMaterial("Copper");
-	G4Material* titanium = G4Material::GetMaterial("Titanium");
-	G4Material* lar = G4Material::GetMaterial("LAr");
-	G4Material* tungsten = G4Material::GetMaterial("Tungsten");
-	G4Material* PEEK = G4Material::GetMaterial("PEEK");
+    ///|////////////////////////////////////////////////////////////////////
+	//|| Dimensions and Parameters - Can be changed.
+    ///|////////////////////////////////////////////////////////////////////
 
-	///|////////////////////////////////////////////////////////////
-	//|| Geometry Dimensions and Parameters
-	///|////////////////////////////////////////////////////////////
 	//// World
 	G4double worldXYZ = 200 * CLHEP::mm;
 
@@ -217,14 +206,22 @@ void FCalDetectorConstruction::SetupGeometry()
 	const int tubcount = 4;
 	double tubtriside = 7.5 * CLHEP::mm;
 	double tubHoleRadius = 5.8 / 2 * CLHEP::mm;
+    ///| End of Dimensions and Parameters //////////////////////////////////
 
-	///|////////////////////////////////////////////////////////////
+    // Get the materials defined in `ConstructMaterials`.
+    G4Material* air = G4Material::GetMaterial("Air");
+    G4Material* vacuum = G4Material::GetMaterial("Vacuum");
+    G4Material* copper = G4Material::GetMaterial("Copper");
+    G4Material* titanium = G4Material::GetMaterial("Titanium");
+    G4Material* lar = G4Material::GetMaterial("LAr");
+    G4Material* tungsten = G4Material::GetMaterial("Tungsten");
+    G4Material* PEEK = G4Material::GetMaterial("PEEK");
+
+    ///|////////////////////////////////////////////////////////////////////
 	//|| World
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	G4Box* worldSolid = new G4Box("World_Solid", worldXYZ, worldXYZ, worldXYZ);
-
 	fpWorldLogical = new G4LogicalVolume(worldSolid, air, "World_Logical");
-
 	fpWorldPhysical = new G4PVPlacement(
 		0,					// Rotation matrix pointer
 		G4ThreeVector(),	// Translation vector
@@ -235,17 +232,10 @@ void FCalDetectorConstruction::SetupGeometry()
 		0					// Copy number
 	);
 
-	/* Dear Professor Rutherfoord:
-	I'm not sure what these two comments are about, so I don't want to take
-	them out yet!
-	 
-	// HandsOn3: Scoring volumes
-	// HandsOn3: Construct scoring components
-	*/
-
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	//|| Rod (The cylinder on the inside of the LAr)
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
+
 	//// Rod / "Wall" (Hollow)
 	G4Tubs* wallSolid = new G4Tubs(
 		"Wall",							 // Name
@@ -282,9 +272,9 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* rodRightLogical = new G4LogicalVolume(
 		rodRightSolid, titanium, "RodRight_Logical");
 
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	//|| Shaft (Thinnest radius. For strength.)
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	G4Tubs* shaftSolid = new G4Tubs(
 		"Shaft",					// Name
 		0,							// Inner radius
@@ -296,10 +286,10 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* shaftLogical = new G4LogicalVolume(
 		shaftSolid, titanium, "Shaft_Logical");
 
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	//|| Cavity (entire cavity between outer shaft and inner rod)
 	//|| and the foil inside (on which the Sr90 is placed)
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	G4Tubs* cavitySolidOut = new G4Tubs(
 		"CavityOut",		// Name
 		shaftRadius,		// Inner radius
@@ -326,9 +316,9 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* foilLogical = new G4LogicalVolume(
 		foilSolid, copper, "Foil_Logical");
 
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	//|| Gap (the LAr gap)
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	G4Tubs* gapSolid = new G4Tubs(
 		"Gap",								// Name
 		rodOuterRadius,						// Inner radius
@@ -340,9 +330,9 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* gapLogical = new G4LogicalVolume(
 		gapSolid, lar, "Gap_Logical");
 
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	//|| Tube (the FCal tube)
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	G4Tubs* tubeSolid = new G4Tubs(
 		"Tube",				// Name
 		tubeInnerRadius,    // Inner radius
@@ -379,9 +369,9 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* tubeRLogical = new G4LogicalVolume(
 		tubeSolidR, titanium, "TubeR_Logical");
 
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	//|| Tungsten Plate Series
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	G4Box* tungPlate = new G4Box("tungPlate",	// Name
 		plateX,									// half x thick
 		plateY,									// half y thick
@@ -501,9 +491,9 @@ void FCalDetectorConstruction::SetupGeometry()
 		0
 	);
 
-	///|////////////////////////////////////////////////////////////
+	///|////////////////////////////////////////////////////////////////////
 	//|| PEEK Box
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	double tshifty[tubcount];
 	double tshiftx[tubcount];
 	double tshiftz[tubcount];
@@ -559,9 +549,9 @@ void FCalDetectorConstruction::SetupGeometry()
 		0
 	);
 
-	///|////////////////////////////////////////////////////////////
-	//|| Assemble the tube
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
+	//|| Assemble the tube(s)
+    ///|////////////////////////////////////////////////////////////////////
 	G4AssemblyVolume* assemblyTube = new G4AssemblyVolume();
 	G4Transform3D Tr0;
 	G4RotationMatrix Ro;
@@ -608,9 +598,9 @@ void FCalDetectorConstruction::SetupGeometry()
 		assemblyTube->MakeImprint(fpWorldLogical, Tr0);
 	}
 
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	//|| Visualization
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	//// Change color palette here
 	G4VisAttributes* colors[] = {
 		new G4VisAttributes(G4Colour(1.0, 0.2, 0.2, 1.0)),	// Hot Red 1.0
@@ -636,9 +626,9 @@ void FCalDetectorConstruction::SetupGeometry()
 		p.first->SetVisAttributes(p.second);
 	}
 
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	//|| Final Stuff
-	///|////////////////////////////////////////////////////////////
+    ///|////////////////////////////////////////////////////////////////////
 	// tracking length in each volume
 	G4double maxStep = 0.001*CLHEP::mm; // 1 mu tracking
 	G4UserLimits * limits = new G4UserLimits(maxStep);
