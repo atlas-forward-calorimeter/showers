@@ -1,0 +1,8 @@
+#This is the macro for a run
+#
+#Initialize kernel
+/run/initialize
+
+#/gun/energy x GeV
+/run/setCut 0.001 mm
+/run/beamOn 10
