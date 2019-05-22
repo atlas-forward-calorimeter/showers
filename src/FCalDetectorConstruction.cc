@@ -217,9 +217,7 @@ void FCalDetectorConstruction::SetupGeometry()
     G4Material* tungsten = G4Material::GetMaterial("Tungsten");
     G4Material* PEEK = G4Material::GetMaterial("PEEK");
 
-    ///|////////////////////////////////////////////////////////////////////
-	//|| World
-    ///|////////////////////////////////////////////////////////////////////
+    //// World
 	G4Box* worldSolid = new G4Box("World_Solid", worldXYZ, worldXYZ, worldXYZ);
 	fpWorldLogical = new G4LogicalVolume(worldSolid, air, "World_Logical");
 	fpWorldPhysical = new G4PVPlacement(
@@ -233,8 +231,68 @@ void FCalDetectorConstruction::SetupGeometry()
 	);
 
     ///|////////////////////////////////////////////////////////////////////
-	//|| Rod (The cylinder on the inside of the LAr)
+    //|| PEEK Box
     ///|////////////////////////////////////////////////////////////////////
+    double tshifty[tubcount];
+    double tshiftx[tubcount];
+    double tshiftz[tubcount];   // Zero.
+    G4RotationMatrix Rth;       // No rotation.
+    G4Transform3D Trh[tubcount];
+
+    for (int it = 0; it < tubcount; it++)
+    {
+        tshifty[it] = -tubtriside / 4 * sqrt(3.) * pow(-1, it);
+        tshiftx[it] = tubtriside / 4 * (it * 2 - 3);
+        tshiftz[it] = 0;
+        Trh[it] = G4Transform3D(
+            Rth, G4ThreeVector(tshiftx[it], tshifty[it], tshiftz[it]));
+    }
+
+    G4Box* outBox = new G4Box(
+        "outBox",			// Name
+        boxX,				// half x thick
+        boxY,				// half y thick
+        boxZ				// half z thick
+    );
+    G4Tubs* tubHole = new G4Tubs(
+        "tubHole",			// Name
+        0,					// Inner radius
+        tubHoleRadius,		// Outer radius
+        boxZ,				// Half length in z
+        0,					// Starting phi angle
+        360					// Segment angle	
+    );
+
+    G4SubtractionSolid *peekBox0 = new G4SubtractionSolid(
+        "peekBox0", outBox, tubHole, Trh[0]);
+    G4SubtractionSolid *peekBox1 = new G4SubtractionSolid(
+        "peekBox1", peekBox0, tubHole, Trh[1]);
+    G4SubtractionSolid *peekBox2 = new G4SubtractionSolid(
+        "peekBox2", peekBox1, tubHole, Trh[2]);
+    G4SubtractionSolid *peekBox3 = new G4SubtractionSolid(
+        "peekBox3", peekBox2, tubHole, Trh[3]);
+
+    G4LogicalVolume* peekBoxLogical = new G4LogicalVolume(
+        peekBox3,	// Solid
+        PEEK,		// Material
+        "peekBox_Logical"
+    );
+
+    new G4PVPlacement(
+        0,                          // Rotation matrix
+        G4ThreeVector(0, 0, 0),		// Translation vector
+        peekBoxLogical,				// Logical volume
+        "peekBox_Physical",
+        fpWorldLogical,
+        false,
+        0
+    );
+
+    ///|////////////////////////////////////////////////////////////////////
+    //|| Calorimeter Tubes
+    ///|////////////////////////////////////////////////////////////////////
+
+	//|| Rod (The cylinder on the inside of the LAr) ///////////////////////
 
 	//// Rod / "Wall" (Hollow)
 	G4Tubs* wallSolid = new G4Tubs(
@@ -272,9 +330,7 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* rodRightLogical = new G4LogicalVolume(
 		rodRightSolid, titanium, "RodRight_Logical");
 
-    ///|////////////////////////////////////////////////////////////////////
-	//|| Shaft (Thinnest radius. For strength.)
-    ///|////////////////////////////////////////////////////////////////////
+	//|| Shaft (Thinnest radius. For strength.) ////////////////////////////
 	G4Tubs* shaftSolid = new G4Tubs(
 		"Shaft",					// Name
 		0,							// Inner radius
@@ -286,10 +342,9 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* shaftLogical = new G4LogicalVolume(
 		shaftSolid, titanium, "Shaft_Logical");
 
-    ///|////////////////////////////////////////////////////////////////////
-	//|| Cavity (entire cavity between outer shaft and inner rod)
-	//|| and the foil inside (on which the Sr90 is placed)
-    ///|////////////////////////////////////////////////////////////////////
+	//|| Cavity (entire cavity between outer shaft and inner rod) //////////
+	//|| and the foil inside (on which the Sr90 is placed) /////////////////
+
 	G4Tubs* cavitySolidOut = new G4Tubs(
 		"CavityOut",		// Name
 		shaftRadius,		// Inner radius
@@ -316,9 +371,7 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* foilLogical = new G4LogicalVolume(
 		foilSolid, copper, "Foil_Logical");
 
-    ///|////////////////////////////////////////////////////////////////////
-	//|| Gap (the LAr gap)
-    ///|////////////////////////////////////////////////////////////////////
+	//|| Gap (the cylindrical LAr gap) /////////////////////////////////////
 	G4Tubs* gapSolid = new G4Tubs(
 		"Gap",								// Name
 		rodOuterRadius,						// Inner radius
@@ -330,9 +383,9 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* gapLogical = new G4LogicalVolume(
 		gapSolid, lar, "Gap_Logical");
 
-    ///|////////////////////////////////////////////////////////////////////
-	//|| Tube (the FCal tube)
-    ///|////////////////////////////////////////////////////////////////////
+	//|| Tube (the FCal outer tube) ////////////////////////////////////////
+
+    //// Middle Tube
 	G4Tubs* tubeSolid = new G4Tubs(
 		"Tube",				// Name
 		tubeInnerRadius,    // Inner radius
@@ -341,7 +394,6 @@ void FCalDetectorConstruction::SetupGeometry()
 		0,					// Starting phi angle
 		360					// Segment angle
 	);
-
 	G4LogicalVolume* tubeLogical = new G4LogicalVolume(
 		tubeSolid, titanium, "Tube_Logical");
 
@@ -369,6 +421,54 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* tubeRLogical = new G4LogicalVolume(
 		tubeSolidR, titanium, "TubeR_Logical");
 
+    //|| Assemble and Place Calorimeters ///////////////////////////////////
+
+    G4AssemblyVolume* assemblyTube = new G4AssemblyVolume();
+    G4Transform3D Tr0;
+    G4RotationMatrix Ro;
+
+    Tr0 = G4Transform3D(Ro, G4ThreeVector(0, 0, 0));
+    assemblyTube->AddPlacedVolume(
+        shaftLogical, Tr0);
+
+    Tr0 = G4Transform3D(Ro, G4ThreeVector(0, 0, -(rodMiddleZ + rodLeftRightZ)));
+    assemblyTube->AddPlacedVolume(
+        rodLeftLogical, Tr0);
+
+    Tr0 = G4Transform3D(Ro, G4ThreeVector(0, 0, rodMiddleZ + rodLeftRightZ));
+    assemblyTube->AddPlacedVolume(
+        rodRightLogical, Tr0);
+
+    Tr0 = G4Transform3D(Ro, G4ThreeVector(0, 0, 0));
+    assemblyTube->AddPlacedVolume(
+        cavityLogical, Tr0);
+    assemblyTube->AddPlacedVolume(
+        foilLogical, Tr0);
+    assemblyTube->AddPlacedVolume(
+        wallLogical, Tr0);
+    assemblyTube->AddPlacedVolume(
+        gapLogical, Tr0);
+    assemblyTube->AddPlacedVolume(
+        tubeLogical, Tr0);
+
+    Tr0 = G4Transform3D(
+        Ro, G4ThreeVector(0, 0, -(tubeMiddleZ + tubeLeftRightZ + tubeGap)));
+    assemblyTube->AddPlacedVolume(
+        tubeLLogical, Tr0);
+
+    Tr0 = G4Transform3D(
+        Ro, G4ThreeVector(0, 0, tubeMiddleZ + tubeLeftRightZ + tubeGap));
+    assemblyTube->AddPlacedVolume(
+        tubeRLogical, Tr0);
+
+    for (int it = 0; it < tubcount; it++)
+    {
+        // four tube
+        Tr0 = G4Transform3D(
+            Ro, G4ThreeVector(tshiftx[it], tshifty[it], tshiftz[it]));
+        assemblyTube->MakeImprint(fpWorldLogical, Tr0);
+    }
+
     ///|////////////////////////////////////////////////////////////////////
 	//|| Tungsten Plate Series
     ///|////////////////////////////////////////////////////////////////////
@@ -378,8 +478,6 @@ void FCalDetectorConstruction::SetupGeometry()
 		tunghzTot / (double)tungPN);			// half z thick
 	G4LogicalVolume* tungPlateLogical = new G4LogicalVolume(
 		tungPlate, tungsten, "tungPlate_Logical");
-	// Changed for edep investivation should be tungPlate_Logical it is
-	// Gap_Logical if we want to include tungsten for edep investigation
 
 	G4Box* larGapTp = new G4Box("larGapTp",		// Name
 		boxX,									// half x thick
@@ -393,14 +491,14 @@ void FCalDetectorConstruction::SetupGeometry()
 	{
 		//// Front
 		new G4PVPlacement(
-			0,  // Rotation matrix
+			0,                  // Rotation matrix
 			//Translation vector
 			G4ThreeVector(0, 0, 
 				boxZ \
 				+ tunghzTot / tungPN \
 				+ (tunghzTot / tungPN + larGThz) * 2 * itunp
 			),
-			tungPlateLogical,  // Logical volume
+			tungPlateLogical,   // Logical volume
 			"tungPlate_Physical",
 			fpWorldLogical,
 			false,
@@ -452,6 +550,7 @@ void FCalDetectorConstruction::SetupGeometry()
 			);
 		}
 
+        // A message.
 		G4cout << "Tungplate series: center for Lar gap is" << LarGapcenter \
 			<< "mm" << G4endl << "    Lar gap is from " << LarGapcenter - 1. \
 			<< " mm to " << LarGapcenter + 0.1 << " mm" << G4endl;
@@ -459,14 +558,14 @@ void FCalDetectorConstruction::SetupGeometry()
 
 	//// Last Piece - Front
 	new G4PVPlacement(
-		0,  //Rotation matrix
+		0,                  //Rotation matrix
 		//Translation vector
 		G4ThreeVector(0, 0, 
 			boxZ \
 			+ tunghzTot / tungPN \
 			+ (tunghzTot / tungPN + larGThz) * 2 * (tungPN - 1)
 		),
-		tungPlateLogical,  //Logical volume
+		tungPlateLogical,   //Logical volume
 		"tungPlate_Physical",
 		fpWorldLogical,
 		false,
@@ -475,7 +574,7 @@ void FCalDetectorConstruction::SetupGeometry()
 
 	//// Last Piece - Back
 	new G4PVPlacement(
-		0,  //Rotation matrix
+		0,                  //Rotation matrix
 		//Translation vector
 		G4ThreeVector(0, 0, 
 			-(
@@ -484,129 +583,22 @@ void FCalDetectorConstruction::SetupGeometry()
 				+ (tunghzTot / tungPN + larGThz) * 2 * (tungBPN - 1)
 			)
 		),
-		tungPlateLogical,  //Logical volume
+		tungPlateLogical,   //Logical volume
 		"tungPlate_Physical",
 		fpWorldLogical,
 		false,
 		0
 	);
+    ///| End of Tungsten Plate Series //////////////////////////////////////
 
-	///|////////////////////////////////////////////////////////////////////
-	//|| PEEK Box
-    ///|////////////////////////////////////////////////////////////////////
-	double tshifty[tubcount];
-	double tshiftx[tubcount];
-	double tshiftz[tubcount];
-	G4RotationMatrix Rth;
-	G4Transform3D Trh[tubcount];
+	//|| Visualization /////////////////////////////////////////////////////
 
-	for (int it = 0; it < tubcount; it++)
-	{
-		tshifty[it] = -tubtriside / 4 * sqrt(3.) * pow(-1, it);
-		tshiftx[it] = tubtriside / 4 * (it * 2 - 3);
-		tshiftz[it] = 0;
-		Trh[it] = G4Transform3D(
-			Rth, G4ThreeVector(tshiftx[it], tshifty[it],tshiftz[it]));
-	}
-
-	G4Box* outBox = new G4Box(
-		"outBox",			// Name
-		boxX,				// half x thick
-		boxY,				// half y thick
-		boxZ				// half z thick
-	);
-	G4Tubs* tubHole = new G4Tubs(
-		"tubHole",			// Name
-		0,					// Inner radius
-		tubHoleRadius,		// Outer radius
-		boxZ,				// Half length in z
-		0,					// Starting phi angle
-		360					// Segment angle	
-	);
-
-	G4SubtractionSolid *peekBox0 = new G4SubtractionSolid(
-		"peekBox0", outBox, tubHole, Trh[0]);
-	G4SubtractionSolid *peekBox1 = new G4SubtractionSolid(
-		"peekBox1", peekBox0, tubHole, Trh[1]);
-	G4SubtractionSolid *peekBox2 = new G4SubtractionSolid(
-		"peekBox2", peekBox1, tubHole, Trh[2]);
-	G4SubtractionSolid *peekBox3 = new G4SubtractionSolid(
-		"peekBox3", peekBox2, tubHole, Trh[3]);
-
-	G4LogicalVolume* peekBoxLogical = new G4LogicalVolume(
-		peekBox3,	// Solid
-		PEEK,		// Material
-		"peekBox_Logical"
-	);
-
-	new G4PVPlacement(
-		0,                          // Rotation matrix
-		G4ThreeVector(0, 0, 0),		// Translation vector
-		peekBoxLogical,				// Logical volume
-		"peekBox_Physical",
-		fpWorldLogical,
-		false,
-		0
-	);
-
-    ///|////////////////////////////////////////////////////////////////////
-	//|| Assemble the tube(s)
-    ///|////////////////////////////////////////////////////////////////////
-	G4AssemblyVolume* assemblyTube = new G4AssemblyVolume();
-	G4Transform3D Tr0;
-	G4RotationMatrix Ro;
-
-	Tr0 = G4Transform3D(Ro, G4ThreeVector(0, 0, 0));
-	assemblyTube->AddPlacedVolume(
-		shaftLogical, Tr0);
-
-	Tr0 = G4Transform3D(Ro, G4ThreeVector(0, 0, -(rodMiddleZ + rodLeftRightZ)));
-	assemblyTube->AddPlacedVolume(
-		rodLeftLogical, Tr0);
-
-	Tr0 = G4Transform3D(Ro, G4ThreeVector(0, 0, rodMiddleZ + rodLeftRightZ));
-	assemblyTube->AddPlacedVolume(
-		rodRightLogical, Tr0);
-
-	Tr0 = G4Transform3D(Ro, G4ThreeVector(0, 0, 0));
-	assemblyTube->AddPlacedVolume(
-		cavityLogical, Tr0);
-	assemblyTube->AddPlacedVolume(
-		foilLogical, Tr0);
-	assemblyTube->AddPlacedVolume(
-		wallLogical, Tr0);
-	assemblyTube->AddPlacedVolume(
-		gapLogical, Tr0);
-	assemblyTube->AddPlacedVolume(
-		tubeLogical, Tr0);
-
-	Tr0 = G4Transform3D(
-		Ro, G4ThreeVector(0, 0, -(tubeMiddleZ + tubeLeftRightZ + tubeGap)));
-	assemblyTube->AddPlacedVolume(
-		tubeLLogical, Tr0);
-
-	Tr0 = G4Transform3D(
-		Ro, G4ThreeVector(0, 0, tubeMiddleZ + tubeLeftRightZ + tubeGap));
-	assemblyTube->AddPlacedVolume(
-		tubeRLogical, Tr0);
-
-	for (int it = 0; it < tubcount; it++)
-	{
-		// four tube
-		Tr0 = G4Transform3D(
-			Ro, G4ThreeVector(tshiftx[it], tshifty[it], tshiftz[it]));
-		assemblyTube->MakeImprint(fpWorldLogical, Tr0);
-	}
-
-    ///|////////////////////////////////////////////////////////////////////
-	//|| Visualization
-    ///|////////////////////////////////////////////////////////////////////
 	//// Change color palette here
 	G4VisAttributes* colors[] = {
-		new G4VisAttributes(G4Colour(1.0, 0.2, 0.2, 1.0)),	// Hot Red 1.0
-		new G4VisAttributes(G4Colour(0.0, 0.5, 0.5, 1.0)),	// Argon Green 0.15
-		new G4VisAttributes(G4Colour(0.5, 0.5, 0.5, 1.0)),	// Silver 0.3
-		new G4VisAttributes(G4Colour(0.4, 0.15, 0.4, 1.0))	// Tungsten 0.3
+		new G4VisAttributes(G4Colour(1.0, 0.2, 0.2, 1.0)),	// Hot Red      1.0
+		new G4VisAttributes(G4Colour(0.0, 0.5, 0.5, 1.0)),	// Argon Green  0.15
+		new G4VisAttributes(G4Colour(0.5, 0.5, 0.5, 1.0)),	// Silver       0.3
+		new G4VisAttributes(G4Colour(0.4, 0.15, 0.4, 1.0))	// Tungsten     0.3
 	};
 	for (const auto& color : colors) {
 		color->SetForceSolid(true);
@@ -625,11 +617,10 @@ void FCalDetectorConstruction::SetupGeometry()
 	for (const auto& p : colorMap) {
 		p.first->SetVisAttributes(p.second);
 	}
+	///| End Of Visualization //////////////////////////////////////////////
 
-    ///|////////////////////////////////////////////////////////////////////
-	//|| Final Stuff
-    ///|////////////////////////////////////////////////////////////////////
-	// tracking length in each volume
+	// Tracking length in each volume:
+
 	G4double maxStep = 0.001*CLHEP::mm; // 1 mu tracking
 	G4UserLimits * limits = new G4UserLimits(maxStep);
 
