@@ -36,6 +36,10 @@ class FCalDetectorConstruction : public G4VUserDetectorConstruction
         virtual G4VPhysicalVolume* Construct();
         virtual void ConstructSDandField();
 
+		// Provide external access to geometry dimensions.
+		G4double rodOuterRadius;
+		G4double tubeInnerRadius;
+
     private:
         G4LogicalVolume *fMatrix;
         G4LogicalVolume *gapLogical;

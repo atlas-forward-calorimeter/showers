@@ -18,7 +18,6 @@ Edited by Anson Kost with the help of Professor John Rutherfoord, May 2019.
 
 #include "FCalDetectorConstruction.hh"
 #include "FCalEmCalorimeterSD.hh"
-#include "FCalGlobals.hh"
 
 #include "G4Material.hh"
 #include "G4NistManager.hh"
@@ -170,13 +169,13 @@ void FCalDetectorConstruction::SetupGeometry()
 
 	//// Rod
 	G4double rodInnerRadius = 4.5 / 2 * CLHEP::mm;
-    // rodOuterRadius = 4.712 / 2 * CLHEP::mm (now in FCalGlobals.hh)
+	rodOuterRadius = 4.712 / 2 * CLHEP::mm;  // (class member for external access)
 	G4double rodMiddleZ = 10.5 / 2 * CLHEP::mm;
 	G4double rodLeftRightZ = 12.25 / 2 * CLHEP::mm;
 	// Total length of rod and tube is 35 mm.
 
 	//// Tube
-	// tubeInnerRadius = 5.25 / 2 * CLHEP::mm (now in FCalGlobals.hh)
+	tubeInnerRadius = 5.25 / 2 * CLHEP::mm;  // (class member for external access)
 	G4double tubeOuterRadius = 6.26 / 2 * CLHEP::mm;
 	G4double tubeMiddleZ = 8 / 2 * CLHEP::mm;
 	G4double tubeLeftRightZ = 13.5 / 2 * CLHEP::mm;

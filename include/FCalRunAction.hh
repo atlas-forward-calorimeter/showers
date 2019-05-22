@@ -18,6 +18,7 @@ class FCalRunAction : public G4UserRunAction
         FCalRunAction();
         virtual ~FCalRunAction();
 
+		virtual G4Run* GenerateRun();
         virtual void BeginOfRunAction(const G4Run*);
         virtual void EndOfRunAction(const G4Run*);
 };

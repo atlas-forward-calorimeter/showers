@@ -4,8 +4,6 @@ This is the header file for Primary Generator Action class
 */
 
 #ifndef FCalPrimaryGeneratorAction_h
-
-
 #define FCalPrimaryGeneratorAction_h 1
 
 #include "G4VUserPrimaryGeneratorAction.hh"
@@ -27,6 +25,5 @@ class FCalPrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction
     private:
         G4ParticleGun* fParticleGun;
 };
-
 
 #endif
