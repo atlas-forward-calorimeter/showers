@@ -1,4 +1,10 @@
-//This is an example main program code 
+/*
+`main`: Where it all starts.
+
+Edited by Anson Kost with the help of Professor John Rutherfoord, May 2019.
+
+*/
+
 #include"FCalDetectorConstruction.hh"
 #include"FCalActionInitialization.hh"
 
@@ -16,74 +22,71 @@
 
 #include "Randomize.hh"
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 int main(int argc, char** argv)
 {
-  //Detect interactive mode and define UI session
-  G4UIExecutive* ui=0;
-  if(argc==1)
+    // Detect interactive mode and define UI session.
+    G4UIExecutive* ui = 0;
+    if (argc == 1)
     {
-      //Let G4UIExecutive guess what is the best available UI
-      ui=new G4UIExecutive(argc,argv);
+        // Let G4UIExecutive guess the best available UI.
+        ui = new G4UIExecutive(argc, argv);
     }
 
-  //Choose the Random engine
-  G4Random::setTheEngine(new CLHEP::RanecuEngine);
+    // Choose the Random engine.
+    G4Random::setTheEngine(new CLHEP::RanecuEngine);
 
 #ifdef G4MULTITHREADED
-  G4MTRunManager* runManager=new G4MTRunManager;
-  //Set the default number of threads to be the number of available cores of the machine
-  runManager->SetNumberOfThreads(4);
+    G4MTRunManager* runManager = new G4MTRunManager;
+    // Set the default number of threads to be the number of available cores of 
+    // the machine.
+    runManager->SetNumberOfThreads(4);
 #else
-  G4RunManager* runManager=new G4RunManager;
+    G4RunManager* runManager = new G4RunManager;
 #endif
 
-  //Set Mandatory user initialization classes
-  //
+    // Set mandatory user initialization classes:
 
-  //The Geometry
-  runManager->SetUserInitialization(new FCalDetectorConstruction());
+    // The Geometry
+    runManager->SetUserInitialization(new FCalDetectorConstruction());
 
-  //The Physics
-  G4VModularPhysicsList* physicsList=new FTFP_BERT;
-  runManager->SetUserInitialization(physicsList);
+    // The Physics
+    G4VModularPhysicsList* physicsList = new FTFP_BERT;
+    runManager->SetUserInitialization(physicsList);
 
-  //User action initialization
-  runManager->SetUserInitialization(new FCalActionInitialization());
+    // User Action Initialization
+    runManager->SetUserInitialization(new FCalActionInitialization());
 
-  //Initialize visualization
-  //
-  G4VisManager* visManager=new G4VisExecutive;
-  visManager->Initialize();
+    // Initialize Visualization
+    G4VisManager* visManager = new G4VisExecutive;
+    visManager->Initialize();
 
-  //Get the pointer to the User Interface manager
-  G4UImanager* UImanager=G4UImanager::GetUIpointer();
+    // Get the pointer to the user interface manager.
+    G4UImanager* UImanager = G4UImanager::GetUIpointer();
 
-  if(!ui)
+    if (!ui)
     {
-      //batch mode
-      G4String command="/control/execute ";
-      G4String fileName=argv[1];
-      UImanager->ApplyCommand(command+fileName);
+        // Batch mode.
+        G4String command = "/control/execute ";
+        G4String fileName = argv[1];
+        UImanager->ApplyCommand(command + fileName);
     }
     else
-      {
-	//interactive mode
-	UImanager->ApplyCommand("/control/execute init_vis.mac");
-	if(ui->IsGUI())
-	  { 
-	    //UImanager->ApplyCommand("/control/execute gui.mac");
-	  }
-	ui->SessionStart();
-	delete ui;
-      }
-  
-  //Job termination
-  //Free the store: user actions, physics_list and detector_description are 
-  //owned and deleted by the run mangager, so they should not be deleted
-  //in the main() program!
+    {
+        // Interactive mode.
+        UImanager->ApplyCommand("/control/execute init_vis.mac");
+        if (ui->IsGUI())
+        {
+            // UImanager->ApplyCommand("/control/execute gui.mac");
+        }
+        ui->SessionStart();
+        delete ui;
+    }
 
-  delete visManager;
-  delete runManager;
-
+    // Job termination.
+    // Free the store: user actions, physics_list and detector_description are 
+    // owned and deleted by the run manager, so they should not be deleted
+    // in the `main` program!
+    delete visManager;
+    delete runManager;
 }
