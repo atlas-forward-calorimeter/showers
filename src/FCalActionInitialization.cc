@@ -1,5 +1,8 @@
-//This is the header file of user initialization class
-//Author: Zhaoyuan Cui
+/*
+This is the header file of user initialization class.
+Author: Zhaoyuan Cui
+
+*/
 
 #include "FCalActionInitialization.hh"
 #include "FCalPrimaryGeneratorAction.hh"
@@ -7,18 +10,18 @@
 #include "FCalEventAction.hh"
 
 FCalActionInitialization::FCalActionInitialization()
-  :G4VUserActionInitialization(){}
+    : G4VUserActionInitialization() {}
 
-FCalActionInitialization::~FCalActionInitialization(){}
+FCalActionInitialization::~FCalActionInitialization() {}
 
 void FCalActionInitialization::BuildForMaster() const
 {
-  SetUserAction(new FCalRunAction);
+    SetUserAction(new FCalRunAction);
 }
 
 void FCalActionInitialization::Build() const
 {
-  SetUserAction(new FCalPrimaryGeneratorAction);
-  SetUserAction(new FCalRunAction);
-  SetUserAction(new FCalEventAction);
+    SetUserAction(new FCalPrimaryGeneratorAction);
+    SetUserAction(new FCalRunAction);
+    SetUserAction(new FCalEventAction);
 }
