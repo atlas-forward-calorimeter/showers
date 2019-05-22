@@ -5,8 +5,6 @@ Author: Zhaoyuan Cui
 */
 
 #ifndef FCalActionInitialization_hh
-
-
 #define FCalActionInitialization_hh 1
 
 #include "G4VUserActionInitialization.hh"
@@ -22,6 +20,5 @@ public:
     virtual void BuildForMaster() const;
     virtual void Build() const;
 };
-
 
 #endif

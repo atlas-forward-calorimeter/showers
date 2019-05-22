@@ -12,8 +12,6 @@ Edited by Anson Kost with the help of Professor John Rutherfoord, May 2019.
 */
 
 #ifndef FCalDetectorConstruction_hh
-
-
 #define FCalDetectorConstruction_hh 1
 
 #include "G4VUserDetectorConstruction.hh"
@@ -54,6 +52,5 @@ class FCalDetectorConstruction : public G4VUserDetectorConstruction
         G4double height;
         G4double xStd;
 };
-
 
 #endif

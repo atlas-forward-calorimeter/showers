@@ -5,8 +5,6 @@ Author: Zhaoyuan Cui
 */
 
 #ifndef FCalRunAction_hh
-
-
 #define FCalRunAction_hh 1
 
 #include "G4UserRunAction.hh"
@@ -23,6 +21,5 @@ class FCalRunAction : public G4UserRunAction
         virtual void BeginOfRunAction(const G4Run*);
         virtual void EndOfRunAction(const G4Run*);
 };
-
 
 #endif
