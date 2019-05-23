@@ -9,15 +9,18 @@ Author: Zhaoyuan Cui
 #include "FCalRunAction.hh"
 #include "FCalEventAction.hh"
 
+
 FCalActionInitialization::FCalActionInitialization()
     : G4VUserActionInitialization() {}
 
 FCalActionInitialization::~FCalActionInitialization() {}
 
+
 void FCalActionInitialization::BuildForMaster() const
 {
     SetUserAction(new FCalRunAction);
 }
+
 
 void FCalActionInitialization::Build() const
 {

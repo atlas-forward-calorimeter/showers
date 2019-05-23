@@ -9,19 +9,16 @@ Author: Zhaoyuan Cui
 #include "FCalRunAction.hh"
 #include "FCalAnalysis.hh"
 #include "FCalEmCalorimeterSD.hh"
-#include "FCalDetectorConstruction.hh"
 
 #include "G4UnitsTable.hh"
 #include "G4SystemOfUnits.hh"
-
-#include "G4RunManager.hh"
 
 
 //// Constructor
 FCalRunAction::FCalRunAction() : G4UserRunAction()
 {
 	G4AnalysisManager* analysisManager = G4AnalysisManager::Instance();
-	G4cout << "Usinggg " << analysisManager->GetType() << G4endl;
+	G4cout << "Using " << analysisManager->GetType() << G4endl;
 
 	// Default settings.
 	analysisManager->SetVerboseLevel(1);
@@ -85,17 +82,16 @@ FCalRunAction::FCalRunAction() : G4UserRunAction()
 }
 
 
-G4Run* FCalRunAction::GenerateRun()
-{
-
-	return G4UserRunAction::GenerateRun();
-}
-
-
 //// Destructor
 FCalRunAction::~FCalRunAction()
 {
     delete G4AnalysisManager::Instance();
+}
+
+
+G4Run* FCalRunAction::GenerateRun()
+{
+	return G4UserRunAction::GenerateRun();
 }
 
 
