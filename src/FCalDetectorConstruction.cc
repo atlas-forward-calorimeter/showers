@@ -132,7 +132,7 @@ void FCalDetectorConstruction::ConstructMaterials()
 	PEEK->AddElement(H, natoms = 12);
 	PEEK->AddElement(O, natoms = 3);
 
-    //// Other Materials
+    //// More Materials
     new G4Material(
         "Copper", z = 29., a = 63.546 * CLHEP::g / CLHEP::mole,
         density = 8.96 * CLHEP::g / CLHEP::cm3
@@ -147,7 +147,7 @@ void FCalDetectorConstruction::ConstructMaterials()
     );
     new G4Material(
         "Titanium", z = 22., a = 47.867 * CLHEP::g / CLHEP::mole,
-        density = 4.506 * CLHEP::g / CLHEP::mole
+        density = 4.506 * CLHEP::g / CLHEP::cm3
     );
 
 	// Print material table.

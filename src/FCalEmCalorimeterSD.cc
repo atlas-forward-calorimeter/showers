@@ -196,7 +196,7 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
         }
     }
 
-    std::ofstream file("anson.csv");
+    std::ofstream file("hitsOutput.csv");
 
     G4double xdep, ydep, zdep, edep;
     for (G4int i = 0; i < nofHits; i++)
