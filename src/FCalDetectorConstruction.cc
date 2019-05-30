@@ -217,6 +217,10 @@ void FCalDetectorConstruction::SetupGeometry()
     G4Material* tungsten = G4Material::GetMaterial("Tungsten");
     G4Material* PEEK = G4Material::GetMaterial("PEEK");
 
+    // Get materials from NIST database.
+    G4Material* stainlessSteel = \
+        G4NistManager::Instance()->FindOrBuildMaterial("G4_STAINLESS-STEEL");
+
     //// World
 	G4Box* worldSolid = new G4Box("World_Solid", worldXYZ, worldXYZ, worldXYZ);
 	fpWorldLogical = new G4LogicalVolume(worldSolid, air, "World_Logical");
@@ -591,6 +595,29 @@ void FCalDetectorConstruction::SetupGeometry()
 	);
     ///| End of Tungsten Plate Series //////////////////////////////////////
 
+    ///|////////////////////////////////////////////////////////////////////
+    //|| Cryo Cylinder
+    ///|////////////////////////////////////////////////////////////////////
+    G4Tubs* cryoSolid = new G4Tubs(
+        "Cryo",			            // Name
+        107.95*CLHEP::mm,	        // Inner radius
+        (107.95 + 1.91)*CLHEP::mm,	// Outer radius
+        30 * CLHEP::mm,             // Half length
+        0,					        // Starting phi angle
+        360					        // Segment angle
+    );
+    G4LogicalVolume* cryoLogical = new G4LogicalVolume(
+        cryoSolid, stainlessSteel, "Cryo_Logical");
+    new G4PVPlacement(
+        0,                          // Rotation matrix
+        G4ThreeVector(0, 0, 0),		// Translation vector
+        cryoLogical,				// Logical volume
+        "Cryo_Physical",
+        fpWorldLogical,
+        false,
+        0
+    );
+
 	//|| Visualization /////////////////////////////////////////////////////
 
 	//// Change color palette here
@@ -613,6 +640,7 @@ void FCalDetectorConstruction::SetupGeometry()
 		{shaftLogical, colors[2]},
 		{wallLogical, colors[2]},
 		{tubeLogical, colors[2]},
+        {cryoLogical, colors[3]}
 	};
 	for (const auto& p : colorMap) {
 		p.first->SetVisAttributes(p.second);
