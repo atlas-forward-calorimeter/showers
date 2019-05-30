@@ -1,0 +1,7 @@
+#!/bin/bash
+# brg: Make, run and graph.
+
+cd build
+make -j32
+./FCal ../runOneBeta.mac
+python ../analysis hitsOutput.csv

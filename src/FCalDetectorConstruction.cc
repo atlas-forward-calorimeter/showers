@@ -132,7 +132,7 @@ void FCalDetectorConstruction::ConstructMaterials()
 	PEEK->AddElement(H, natoms = 12);
 	PEEK->AddElement(O, natoms = 3);
 
-    //// Other Materials
+    //// More Materials
     new G4Material(
         "Copper", z = 29., a = 63.546 * CLHEP::g / CLHEP::mole,
         density = 8.96 * CLHEP::g / CLHEP::cm3
@@ -147,7 +147,7 @@ void FCalDetectorConstruction::ConstructMaterials()
     );
     new G4Material(
         "Titanium", z = 22., a = 47.867 * CLHEP::g / CLHEP::mole,
-        density = 4.506 * CLHEP::g / CLHEP::mole
+        density = 4.506 * CLHEP::g / CLHEP::cm3
     );
 
 	// Print material table.
@@ -169,13 +169,13 @@ void FCalDetectorConstruction::SetupGeometry()
 
 	//// Rod
 	G4double rodInnerRadius = 4.5 / 2 * CLHEP::mm;
-	rodOuterRadius = 4.712 / 2 * CLHEP::mm;  // (class member for external access)
+	G4double rodOuterRadius = 4.712 / 2 * CLHEP::mm;
 	G4double rodMiddleZ = 10.5 / 2 * CLHEP::mm;
 	G4double rodLeftRightZ = 12.25 / 2 * CLHEP::mm;
 	// Total length of rod and tube is 35 mm.
 
 	//// Tube
-	tubeInnerRadius = 5.25 / 2 * CLHEP::mm;  // (class member for external access)
+	G4double tubeInnerRadius = 5.25 / 2 * CLHEP::mm;
 	G4double tubeOuterRadius = 6.26 / 2 * CLHEP::mm;
 	G4double tubeMiddleZ = 8 / 2 * CLHEP::mm;
 	G4double tubeLeftRightZ = 13.5 / 2 * CLHEP::mm;
@@ -203,7 +203,7 @@ void FCalDetectorConstruction::SetupGeometry()
 	int tungBPN = 4;	// # of back plates
 
 	//// More Important Parameters
-	const int tubcount = 4;
+	const int numCals = 4;  // # of complete calorimeter tubes
 	double tubtriside = 7.5 * CLHEP::mm;
 	double tubHoleRadius = 5.8 / 2 * CLHEP::mm;
     ///| End of Dimensions and Parameters //////////////////////////////////
@@ -233,13 +233,13 @@ void FCalDetectorConstruction::SetupGeometry()
     ///|////////////////////////////////////////////////////////////////////
     //|| PEEK Box
     ///|////////////////////////////////////////////////////////////////////
-    double tshifty[tubcount];
-    double tshiftx[tubcount];
-    double tshiftz[tubcount];   // Zero.
+    double tshifty[numCals];
+    double tshiftx[numCals];
+    double tshiftz[numCals];   // Zero.
     G4RotationMatrix Rth;       // No rotation.
-    G4Transform3D Trh[tubcount];
+    G4Transform3D Trh[numCals];
 
-    for (int it = 0; it < tubcount; it++)
+    for (int it = 0; it < numCals; it++)
     {
         tshifty[it] = -tubtriside / 4 * sqrt(3.) * pow(-1, it);
         tshiftx[it] = tubtriside / 4 * (it * 2 - 3);
@@ -461,7 +461,7 @@ void FCalDetectorConstruction::SetupGeometry()
     assemblyTube->AddPlacedVolume(
         tubeRLogical, Tr0);
 
-    for (int it = 0; it < tubcount; it++)
+    for (int it = 0; it < numCals; it++)
     {
         // four tube
         Tr0 = G4Transform3D(

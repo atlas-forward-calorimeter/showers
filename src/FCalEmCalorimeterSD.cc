@@ -9,6 +9,8 @@ Edited by Anson Kost with the help of Professor John Rutherfoord, May 2019.
 #include "FCalEmCalorimeterSD.hh"
 #include "FCalAnalysis.hh"
 
+#include "driftSignal.hh"
+
 #include "G4HCofThisEvent.hh"
 #include "G4Step.hh"
 #include "G4ThreeVector.hh"
@@ -19,7 +21,15 @@ Edited by Anson Kost with the help of Professor John Rutherfoord, May 2019.
 #include "G4Accumulable.hh"
 #include "G4AccumulableManager.hh"
 
-#include "driftSignal.hh"
+#include <fstream>
+
+
+///|////////////////////////////////////////////////////////////////////////////
+//|| (Repeated) Detector Geometry Parameters
+///|////////////////////////////////////////////////////////////////////////////
+const int numCals = 4;
+const int tungPN = 8;
+const int tungBPN = 4;
 
 
 //// Constructor
@@ -32,13 +42,11 @@ FCalEmCalorimeterSD::FCalEmCalorimeterSD(
     collectionName.insert(hitsCollectionName);
     const int nbins = 64;
     const int nrings = 3;
-    const int ntubs = 4;
-    const int nLar_Tp = 10;
     std::vector<G4double> fDose0(nbins, 0);
     std::vector<std::vector<G4double>> fDose1(nrings, fDose0);
     fDoseRZ \
-        = new std::vector<std::vector<std::vector<G4double>>>(ntubs, fDose1);
-    ED_Lar_Tp = new std::vector<G4double>(nLar_Tp, 0);
+        = new std::vector<std::vector<std::vector<G4double>>>(numCals, fDose1);
+    ED_Lar_Tp = new std::vector<G4double>(tungPN, 0);
     ETot_Lar_Tp = 0.;
     ETot_Lar = 0.;
     ETot_Lar_CTub = 0.;
@@ -90,16 +98,19 @@ void FCalEmCalorimeterSD::Initialize(G4HCofThisEvent* hce)
 G4bool FCalEmCalorimeterSD::ProcessHits(G4Step* aStep,
 					G4TouchableHistory*)
 {
-    // Energy deposit.
-    G4double edep = aStep->GetTotalEnergyDeposit();
+    G4double edep = aStep->GetTotalEnergyDeposit();  // Energy deposit.
 
-    if (edep == 0.) return false;
+    if (edep == 0.) return false;  // Skip if no energy deposit.
 
     FCalEmCalorimeterHit* newHit = new FCalEmCalorimeterHit();
+
     newHit->SetEdep(edep);
     newHit->SetPos(aStep->GetPostStepPoint()->GetPosition());
-    fHitsCollection->insert(newHit);
+    newHit->SetMomentum(aStep->GetPostStepPoint()->GetMomentum());
+    newHit->SetTotalEnergy(aStep->GetPostStepPoint()->GetTotalEnergy());
+    newHit->SetTrackID(aStep->GetTrack()->GetTrackID());
 
+    fHitsCollection->insert(newHit);
     return true;
 }
 
@@ -157,19 +168,17 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
     G4double tunghzTot = 1.;
     G4double larGThz = 0.1;
     G4double larGThzvar = 0.02 * 2;
-    int tungPN = 6;
-    const int LarTpn = 10;
-    double zLarTpc[LarTpn];
+    double zLarTpc[tungPN];
 
-    for (int il = 0; il < LarTpn; il++) {
-        if (il < LarTpn / 2) {
+    for (int il = 0; il < tungPN; il++) {
+        if (il < tungPN / 2) {
             zLarTpc[il] =
                 -(
                     boxhz
-                    + tunghzTot / (double)tungPN * 2 * (tungPN - 1)
-                    + larGThz * 2 * (tungPN - 2)
+                    + tunghzTot / (double)tungBPN * 2 * (tungBPN - 1)
+                    + larGThz * 2 * (tungBPN - 2)
                     + larGThz
-                ) + il * (tunghzTot / tungPN + larGThz) * 2;
+                ) + il * (tunghzTot / tungBPN + larGThz) * 2;
 
             // G4cout << "in SD define Tungplate series: z ceter for Lar gap "
             //           "is " << zLarTpc[il] << G4endl; 
@@ -177,8 +186,8 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
         } else {
             zLarTpc[il] =
                 boxhz
-                + tunghzTot / (double)tungPN * 2
-                + (il - LarTpn / 2) * (tunghzTot / tungPN + larGThz) * 2
+                + tunghzTot / (double)tungBPN * 2
+                + (il - tungPN / 2) * (tunghzTot / tungBPN + larGThz) * 2
                 + larGThz;
 
             // G4cout << "in SD define Tungplate series: z ceter for Lar gap "
@@ -186,6 +195,8 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
             // Test if tungplate coordinates are correct as in geometry.
         }
     }
+
+    std::ofstream file("hitsOutput.csv");
 
     G4double xdep, ydep, zdep, edep;
     for (G4int i = 0; i < nofHits; i++)
@@ -258,7 +269,7 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
         }
 
         // Filling LarGap Tung plate vector.
-        for (int il = 0; il < LarTpn; il++) {
+        for (int il = 0; il < tungPN; il++) {
             if (fabs(zdep / CLHEP::cm - zLarTpc[il]) <= larGThz) {
                 (*ED_Lar_Tp)[il] += edep;
                 ETot_Lar_Tp += edep;
@@ -320,7 +331,18 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
             sqrt(pow(xdep, 2) + pow(ydep, 2)) / CLHEP::cm, 
             edep / CLHEP::keV
         );
+
+        // For python!
+        file << edep << ", " << xdep << ", " << ydep << ", " << zdep
+            << ", " << hit->GetTotalEnergy()
+            << ", " << hit->GetMomentum().x()
+            << ", " << hit->GetMomentum().y()
+            << ", " << hit->GetMomentum().z()
+            << ", " << hit->GetTrackID()
+            << G4endl;
     } // hits loop end
+
+    file.close();
 
     for (double ihb = 0; ihb < 10; ihb = ihb + 1.0) {
         // analysisManager->FillH1(1, ihb + 0.5, (*ED_Lar_Tp)[ihb]/CLHEP::keV);

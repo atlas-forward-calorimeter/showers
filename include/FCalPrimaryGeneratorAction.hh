@@ -11,8 +11,10 @@ This is the header file for Primary Generator Action class
 #include "G4ThreeVector.hh"
 #include "G4SystemOfUnits.hh"
 
+
 class G4ParticleGun;
 class G4Event;
+
 
 class FCalPrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction
 {
