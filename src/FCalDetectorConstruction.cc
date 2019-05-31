@@ -639,7 +639,7 @@ void FCalDetectorConstruction::SetupGeometry()
         0
     );
 
-    //// Cryostat Middle of Liquid Argon
+    //// Cryostat Middle, Liquid Argon
     G4Tubs* cryoMiddleSolid = new G4Tubs(
         "Cryo_Middle",                      // Name
         cryoIIRadius + cryoInnerThickness,	// Inner radius
