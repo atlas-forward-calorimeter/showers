@@ -48,7 +48,7 @@ Edited by Anson Kost with the help of Professor John Rutherfoord, May 2019.
 #include <map>
 
 
-//// Constructor and destructor.
+//// Constructor and Destructor
 
 FCalDetectorConstruction::FCalDetectorConstruction() 
 	: fpWorldLogical(0), fpWorldPhysical(0) {}
@@ -56,8 +56,7 @@ FCalDetectorConstruction::FCalDetectorConstruction()
 FCalDetectorConstruction::~FCalDetectorConstruction() {}
 
 
-// "Invoked in the master thread."
-// Instantiates necessary materials and volumes.
+// Instantiate materials and volumes (once in master thread).
 G4VPhysicalVolume* FCalDetectorConstruction::Construct()
 {
 	ConstructMaterials();
@@ -71,12 +70,11 @@ G4VPhysicalVolume* FCalDetectorConstruction::Construct()
 ///|////////////////////////////////////////////////////////////////////////////
 void FCalDetectorConstruction::ConstructSDandField()
 {
-	// Make the sensitive detector.
-	G4String trackerChamberSDname = "FCalSD";
+	// Make a sensitive detector.
 	FCalEmCalorimeterSD* aTrackerSD = new FCalEmCalorimeterSD(
-		trackerChamberSDname, 
-		"FCalHitsCollection"
-	);
+		"FCalSD",               // sensitive detector name
+        "FCalHitsCollection"    // detector's hits collection name
+    );
 	G4SDManager::GetSDMpointer()->AddNewDetector(aTrackerSD);
 
 	// Make all logical volumes with the name "Gap_Logical" sensitive.
@@ -89,26 +87,40 @@ void FCalDetectorConstruction::ConstructSDandField()
 ///|////////////////////////////////////////////////////////////////////////////
 void FCalDetectorConstruction::ConstructMaterials()
 {
-	G4String symbol;
-	G4double a, z, n, density;
+    // For named parameters.
+	G4String name, symbol;
+    G4double z, Zeff;  // (effective) # of protons
+    G4double a, Aeff;  // (effective) total mass
+    G4double n, density, fractionmass;
 	G4int ncomponents, nisotopes, natoms;
-	G4double fractionmass;
 
 	//// Elements
-	G4Element* N = new G4Element(
-		"Nitrogen", symbol = "N", z = 7., a = 14.01 * CLHEP::g / CLHEP::mole
-	);
+    G4Element* N = new G4Element(
+        name = "Nitrogen",
+        symbol = "N",
+        Zeff = 7.,                             
+        Aeff = 14.01 * CLHEP::g / CLHEP::mole
+    );
 	G4Element* O = new G4Element(
-		"Oxygen", symbol = "O", z = 8., a = 16.00 * CLHEP::g / CLHEP::mole
+		name = "Oxygen", 
+        symbol = "O", 
+        Zeff = 8., 
+        Aeff = 16. * CLHEP::g / CLHEP::mole
 	);
 	G4Element* H = new G4Element(
-		"Hydrogen", symbol = "H", z = 1., a = 1.0078 * CLHEP::g / CLHEP::mole
+		name = "Hydrogen", 
+        symbol = "H", 
+        Zeff = 1., 
+        Aeff = 1.0078 * CLHEP::g / CLHEP::mole
 	);
 	G4Element* C = new G4Element(
-		"Carbon", symbol = "C", z = 6., a = 12 * CLHEP::g / CLHEP::mole
+		name = "Carbon", 
+        symbol = "C", 
+        Zeff = 6., 
+        Zeff = 12 * CLHEP::g / CLHEP::mole
 	);
 
-    //// Materials 
+    //// Build Materials
 
 	//// Air
 	G4Material* air = new G4Material(
@@ -132,26 +144,31 @@ void FCalDetectorConstruction::ConstructMaterials()
 	PEEK->AddElement(H, natoms = 12);
 	PEEK->AddElement(O, natoms = 3);
 
-    //// More Materials
+    //// Create More Materials
     new G4Material(
-        "Copper", z = 29., a = 63.546 * CLHEP::g / CLHEP::mole,
+        name = "Copper", 
+        z = 29., 
+        a = 63.546 * CLHEP::g / CLHEP::mole,
         density = 8.96 * CLHEP::g / CLHEP::cm3
     );
     new G4Material(
-        "LAr", z = 18., a = 39.948 * CLHEP::g / CLHEP::mole,
+        name = "LAr", 
+        z = 18., 
+        a = 39.948 * CLHEP::g / CLHEP::mole,
         density = 1.396 * CLHEP::g / CLHEP::cm3
     );
     new G4Material(
-        "Tungsten", z = 74., a = 183.84 * CLHEP::g / CLHEP::mole,
+        name = "Tungsten", 
+        z = 74., 
+        a = 183.84 * CLHEP::g / CLHEP::mole,
         density = 19.25 * CLHEP::g / CLHEP::cm3
     );
     new G4Material(
-        "Titanium", z = 22., a = 47.867 * CLHEP::g / CLHEP::mole,
+        name = "Titanium", 
+        z = 22., 
+        a = 47.867 * CLHEP::g / CLHEP::mole,
         density = 4.506 * CLHEP::g / CLHEP::cm3
     );
-
-	// Print material table.
-	G4cout << *(G4Material::GetMaterialTable()) << G4endl;
 }
 
 
@@ -172,7 +189,7 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4double rodOuterRadius = 4.712 / 2 * CLHEP::mm;
 	G4double rodMiddleZ = 10.5 / 2 * CLHEP::mm;
 	G4double rodLeftRightZ = 12.25 / 2 * CLHEP::mm;
-	// Total length of rod and tube is 35 mm.
+	// Total lengths of rod and tube are 35 mm.
 
 	//// Tube
 	G4double tubeInnerRadius = 5.25 / 2 * CLHEP::mm;
@@ -202,8 +219,9 @@ void FCalDetectorConstruction::SetupGeometry()
 	//// Tungsten Plates
 	G4double plateX = 30 / 2 * CLHEP::mm;
 	G4double plateY = plateX;
+    G4double plateZ = 3.5 / 2 * CLHEP::mm;
 	G4double tunghzTot = plateX;
-	G4double larGThz = 2 * CLHEP::mm;
+	G4double larGThz = 4 / 2 * CLHEP::mm;
 	int tungPN = 8;		// # of front plates
 	int tungBPN = 4;	// # of back plates
 
@@ -220,7 +238,7 @@ void FCalDetectorConstruction::SetupGeometry()
 
     ///| End of Dimensions and Parameters //////////////////////////////////
 
-    // Get the materials defined in `ConstructMaterials`.
+    // Get materials defined in `ConstructMaterials`.
     G4Material* air = G4Material::GetMaterial("Air");
     G4Material* vacuum = G4Material::GetMaterial("Vacuum");
     G4Material* copper = G4Material::GetMaterial("Copper");
@@ -229,7 +247,7 @@ void FCalDetectorConstruction::SetupGeometry()
     G4Material* tungsten = G4Material::GetMaterial("Tungsten");
     G4Material* PEEK = G4Material::GetMaterial("PEEK");
 
-    // Get materials from NIST database.
+    // Get materials from the NIST database.
     G4Material* stainlessSteel = \
         G4NistManager::Instance()->FindOrBuildMaterial("G4_STAINLESS-STEEL");
 
@@ -251,7 +269,7 @@ void FCalDetectorConstruction::SetupGeometry()
     ///|////////////////////////////////////////////////////////////////////
     double tshifty[numCals];
     double tshiftx[numCals];
-    double tshiftz[numCals];   // Zero.
+    double tshiftz[numCals];    // Zero.
     G4RotationMatrix Rth;       // No rotation.
     G4Transform3D Trh[numCals];
 
@@ -565,11 +583,6 @@ void FCalDetectorConstruction::SetupGeometry()
 				0
 			);
 		}
-
-        // A message.
-		G4cout << "Tungplate series: center for Lar gap is" << LarGapcenter \
-			<< "mm" << G4endl << "    Lar gap is from " << LarGapcenter - 1. \
-			<< " mm to " << LarGapcenter + 0.1 << " mm" << G4endl;
 	}
 
 	//// Last Piece - Front
@@ -606,6 +619,121 @@ void FCalDetectorConstruction::SetupGeometry()
 		0
 	);
     ///| End of Tungsten Plate Series //////////////////////////////////////
+
+    /*
+     ///|////////////////////////////////////////////////////////////////////
+    //|| Tungsten Plate Series
+    ///|////////////////////////////////////////////////////////////////////
+    G4Box* tungPlate = new G4Box("tungPlate",	// Name
+        plateX,									// half x thick
+        plateY,									// half y thick
+        plateZ);			                    // half z thick
+    G4LogicalVolume* tungPlateLogical = new G4LogicalVolume(
+        tungPlate, tungsten, "tungPlate_Logical");
+
+    G4Box* larGapTp = new G4Box("larGapTp",		// Name
+        boxX,									// half x thick
+        boxY,									// half y thick
+        larGThz);								// half z thick
+    G4LogicalVolume* larGapTpLogical = new G4LogicalVolume(
+        larGapTp, lar, "Gap_Logical");
+
+    G4double LarGapcenter;
+    for (int itunp = 0; itunp < tungPN - 1; itunp++)
+    {
+        //// Front Plates and Gaps
+        new G4PVPlacement(
+            0,                  // Rotation matrix
+            //Translation vector
+            G4ThreeVector(0, 0,
+                boxZ \
+                + plateZ \
+                + 2 * (plateZ + larGThz) * itunp
+            ),
+            tungPlateLogical,   // Logical volume
+            "tungPlate_Physical",
+            fpWorldLogical,
+            false,
+            0
+        );
+
+        LarGapcenter = boxZ + 2 * plateZ + larGThz \
+            + 2 * (plateZ + larGThz) * itunp;
+
+        new G4PVPlacement(
+            0,										//Rotation matrix
+            G4ThreeVector(0, 0, LarGapcenter),		//Translation vector
+            larGapTpLogical,						//Logical volume
+            "larGapTp_Physical",
+            fpWorldLogical,
+            false,
+            0
+        );
+
+        //// Back Plates and Gaps
+        if (itunp < tungBPN - 1)
+        {
+            new G4PVPlacement(
+                0,  //Rotation matrix
+                //Translation vector
+                G4ThreeVector(
+                    0, 0,
+                    -(boxZ
+                      + plateZ
+                      + 2 * (plateZ + larGThz) * itunp)
+                ),
+                tungPlateLogical,  //Logical volume
+                "tungPlate_Physical",
+                fpWorldLogical,
+                false,
+                0
+            );
+
+            new G4PVPlacement(
+                0,										//Rotation matrix
+                G4ThreeVector(0, 0, -LarGapcenter),		//Translation vector
+                larGapTpLogical,                        //Logical volume
+                "larGapTp_Physical",
+                fpWorldLogical,
+                false,
+                0
+            );
+        }
+    }
+
+    //// Last Plate (No LAr Gap) - Front
+    new G4PVPlacement(
+        0,                  //Rotation matrix
+        //Translation vector
+        G4ThreeVector(0, 0,
+            boxZ \
+            + plateZ \
+            + 2 * (plateZ + larGThz) * (tungPN - 1)
+        ),
+        tungPlateLogical,   //Logical volume
+        "tungPlate_Physical",
+        fpWorldLogical,
+        false,
+        0
+    );
+
+    //// Last Plate (No LAr Gap) - Back
+    new G4PVPlacement(
+        0,                  //Rotation matrix
+        //Translation vector
+        G4ThreeVector(0, 0,
+            -(boxZ
+              + plateZ
+              + 2 * (plateZ + larGThz) * (tungBPN - 1))
+        ),
+        tungPlateLogical,   //Logical volume
+        "tungPlate_Physical",
+        fpWorldLogical,
+        false,
+        0
+    );
+    ///| End of Tungsten Plate Series //////////////////////////////////////
+    */
 
     ///|////////////////////////////////////////////////////////////////////
     //|| Cryostat
