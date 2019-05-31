@@ -1,4 +1,6 @@
 .vs
 .vscode
 build
-analysis/__pycache__
+data
+**/__pycache__
+**/.ipynb_checkpoints

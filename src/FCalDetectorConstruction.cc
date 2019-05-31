@@ -181,6 +181,11 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4double tubeLeftRightZ = 13.5 / 2 * CLHEP::mm;
 	G4double tubeGap = 0.025 * CLHEP::mm;  // gap between tube parts
 
+	//// Tube Placement
+    const int numCals = 4;  // # of complete calorimeter tubes
+    double tubtriside = 7.5 * CLHEP::mm;
+    double tubHoleRadius = 5.8 / 2 * CLHEP::mm;
+
 	//// Shaft
 	G4double shaftRadius = 3 / 2 * CLHEP::mm;
 
@@ -195,17 +200,24 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4double boxZ = 43.5 / 2 * CLHEP::mm;
 
 	//// Tungsten Plates
-	G4double plateX = 35 / 2 * CLHEP::mm;
+	G4double plateX = 30 / 2 * CLHEP::mm;
 	G4double plateY = plateX;
 	G4double tunghzTot = plateX;
 	G4double larGThz = 2 * CLHEP::mm;
 	int tungPN = 8;		// # of front plates
 	int tungBPN = 4;	// # of back plates
 
-	//// More Important Parameters
-	const int numCals = 4;  // # of complete calorimeter tubes
-	double tubtriside = 7.5 * CLHEP::mm;
-	double tubHoleRadius = 5.8 / 2 * CLHEP::mm;
+    //// Cryostat
+    G4double cryoIIRadius = 107.95 * CLHEP::mm;       // inner wall inner radius
+    G4double cryoInnerThickness = 1.91 * CLHEP::mm;   // inner wall thickness
+    G4double cryoOORadius = 125 * CLHEP::mm;          // outer wall outer radius
+    G4double cryoOuterThickness = 2.29 * CLHEP::mm;   // outer wall thickness
+    G4double cryoPosX = -38.5 * CLHEP::mm;
+    G4double cryoPosY = 0;
+    G4double cryoHalfLength = 100 / 2 * CLHEP::mm;
+    G4double cryoStartAngle = 30 * CLHEP::degree;     // angular bounds
+    G4double cryoStopAngle = 100 * CLHEP::degree;
+
     ///| End of Dimensions and Parameters //////////////////////////////////
 
     // Get the materials defined in `ConstructMaterials`.
@@ -216,6 +228,10 @@ void FCalDetectorConstruction::SetupGeometry()
     G4Material* lar = G4Material::GetMaterial("LAr");
     G4Material* tungsten = G4Material::GetMaterial("Tungsten");
     G4Material* PEEK = G4Material::GetMaterial("PEEK");
+
+    // Get materials from NIST database.
+    G4Material* stainlessSteel = \
+        G4NistManager::Instance()->FindOrBuildMaterial("G4_STAINLESS-STEEL");
 
     //// World
 	G4Box* worldSolid = new G4Box("World_Solid", worldXYZ, worldXYZ, worldXYZ);
@@ -591,6 +607,78 @@ void FCalDetectorConstruction::SetupGeometry()
 	);
     ///| End of Tungsten Plate Series //////////////////////////////////////
 
+    ///|////////////////////////////////////////////////////////////////////
+    //|| Cryostat
+    ///|////////////////////////////////////////////////////////////////////
+
+    // Position and rotation.
+    G4RotationMatrix cryoRotation;
+    cryoRotation.rotateX(90 * CLHEP::degree);
+    G4Transform3D cryoTransform = G4Transform3D(
+        cryoRotation,
+        G4ThreeVector(cryoPosX, cryoPosY, 0)
+    );
+
+    //// Cryostat Inner Wall
+    G4Tubs* cryoInnerWallSolid = new G4Tubs(
+        "Cryo_Inner_Wall",                  // Name
+        cryoIIRadius,	                    // Inner radius
+        cryoIIRadius + cryoInnerThickness,	// Outer radius
+        cryoHalfLength,                     // Half length
+        cryoStartAngle,				        // Starting phi angle
+        cryoStopAngle - cryoStartAngle      // Segment angle
+    );
+    G4LogicalVolume* cryoInnerWallLogical = new G4LogicalVolume(
+        cryoInnerWallSolid, stainlessSteel, "Cryo_Inner_Wall_Logical");
+    new G4PVPlacement(
+        cryoTransform,
+        cryoInnerWallLogical,
+        "Cryo_Inner_Wall_Physical",
+        fpWorldLogical,
+        false,
+        0
+    );
+
+    //// Cryostat Middle, Liquid Argon
+    G4Tubs* cryoMiddleSolid = new G4Tubs(
+        "Cryo_Middle",                      // Name
+        cryoIIRadius + cryoInnerThickness,	// Inner radius
+        cryoOORadius - cryoOuterThickness,	// Outer radius
+        cryoHalfLength,                     // Half length
+        cryoStartAngle,					    // Starting phi angle
+        cryoStopAngle - cryoStartAngle		// Segment angle
+    );
+    G4LogicalVolume* cryoMiddleLogical = new G4LogicalVolume(
+        cryoMiddleSolid, lar, "Cryo_Middle_Logical");
+    new G4PVPlacement(
+        cryoTransform,
+        cryoMiddleLogical,
+        "Cryo_Middle_Physical",
+        fpWorldLogical,
+        false,
+        0
+    );
+
+    //// Cryostat Outer Wall
+    G4Tubs* cryoOuterWallSolid = new G4Tubs(
+        "Cryo_Inner_Wall",                  // Name
+        cryoOORadius - cryoOuterThickness,	// Inner radius
+        cryoOORadius,	                    // Outer radius
+        cryoHalfLength,                     // Half length
+        cryoStartAngle,					    // Starting phi angle
+        cryoStopAngle - cryoStartAngle		// Segment angle
+    );
+    G4LogicalVolume* cryoOuterWallLogical = new G4LogicalVolume(
+        cryoOuterWallSolid, stainlessSteel, "Cryo_Outer_Wall_Logical");
+    new G4PVPlacement(
+        cryoTransform,
+        cryoOuterWallLogical,
+        "Cryo_Outer_Wall_Physical",
+        fpWorldLogical,
+        false,
+        0
+    );
+
 	//|| Visualization /////////////////////////////////////////////////////
 
 	//// Change color palette here
@@ -613,6 +701,9 @@ void FCalDetectorConstruction::SetupGeometry()
 		{shaftLogical, colors[2]},
 		{wallLogical, colors[2]},
 		{tubeLogical, colors[2]},
+        {cryoInnerWallLogical, colors[2]},
+        {cryoMiddleLogical, colors[1]},
+        {cryoOuterWallLogical, colors[2]},
 	};
 	for (const auto& p : colorMap) {
 		p.first->SetVisAttributes(p.second);

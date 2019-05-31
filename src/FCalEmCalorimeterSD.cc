@@ -122,6 +122,12 @@ void FCalEmCalorimeterSD::GetETot(G4double *ETot_Lar_Tp) {
 
 void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
 {
+
+	///|////////////////////////////////////////////////////////////////////
+	//|| Data Output Filename(s)
+	///|////////////////////////////////////////////////////////////////////
+	std::string hitsFilename = "data/hits.csv";
+
     G4AnalysisManager* analysisManager = G4AnalysisManager::Instance();
     G4int eID = 0;
     const G4Event* evt = G4RunManager::GetRunManager()->GetCurrentEvent();
@@ -196,7 +202,12 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
         }
     }
 
-    std::ofstream file("hitsOutput.csv");
+    std::ofstream file(hitsFilename);
+	if (file.is_open())
+		G4cout << "Will write data to " << hitsFilename << G4endl;
+	else
+		G4cerr << "Couldn't open " << hitsFilename << " for writing data."
+			<< G4endl;
 
     G4double xdep, ydep, zdep, edep;
     for (G4int i = 0; i < nofHits; i++)
@@ -334,10 +345,10 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
 
         // For python!
         file << edep << ", " << xdep << ", " << ydep << ", " << zdep
-            << ", " << hit->GetTotalEnergy()
+        /*  << ", " << hit->GetTotalEnergy()
             << ", " << hit->GetMomentum().x()
             << ", " << hit->GetMomentum().y()
-            << ", " << hit->GetMomentum().z()
+            << ", " << hit->GetMomentum().z()  */
             << ", " << hit->GetTrackID()
             << G4endl;
     } // hits loop end
