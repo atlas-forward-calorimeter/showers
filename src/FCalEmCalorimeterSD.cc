@@ -126,7 +126,7 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
 	///|////////////////////////////////////////////////////////////////////
 	//|| Data Output Filename(s)
 	///|////////////////////////////////////////////////////////////////////
-	std::string hitsFilename = "data/HitsOut.csv";
+	std::string hitsFilename = "data/hits.csv";
 
     G4AnalysisManager* analysisManager = G4AnalysisManager::Instance();
     G4int eID = 0;

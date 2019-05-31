@@ -200,7 +200,7 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4double boxZ = 43.5 / 2 * CLHEP::mm;
 
 	//// Tungsten Plates
-	G4double plateX = 35 / 2 * CLHEP::mm;
+	G4double plateX = 30 / 2 * CLHEP::mm;
 	G4double plateY = plateX;
 	G4double tunghzTot = plateX;
 	G4double larGThz = 2 * CLHEP::mm;
