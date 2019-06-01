@@ -1,7 +1,8 @@
 # A test run.
 
+/process/em/verbose 0  # Verbosity.
+
 /run/initialize  # Initialize kernel.
 
 /run/setCut 0.001 mm
 /run/beamOn 1
-
