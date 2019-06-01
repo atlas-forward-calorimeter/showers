@@ -69,7 +69,7 @@ G4bool FCalEmCalorimeterSD::ProcessHits(G4Step* aStep,
     newHit->SetPos(aStep->GetPostStepPoint()->GetPosition());
     // newHit->SetMomentum(aStep->GetPostStepPoint()->GetMomentum());
     // newHit->SetTotalEnergy(aStep->GetPostStepPoint()->GetTotalEnergy());
-    newHit->SetTrackID(aStep->GetTrack()->GetTrackID());
+    // newHit->SetTrackID(aStep->GetTrack()->GetTrackID());
 
     fHitsCollection->insert(newHit);
     return true;
@@ -115,8 +115,8 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
         /*  << ", " << hit->GetTotalEnergy()
             << ", " << hit->GetMomentum().x()
             << ", " << hit->GetMomentum().y()
-            << ", " << hit->GetMomentum().z()  */
-            << ", " << hit->GetTrackID()
+            << ", " << hit->GetMomentum().z()
+            << ", " << hit->GetTrackID()  */
             << G4endl;
     }
 

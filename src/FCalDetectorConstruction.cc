@@ -232,6 +232,8 @@ void FCalDetectorConstruction::SetupGeometry()
     G4double cryoOuterThickness = 2.29 * CLHEP::mm;   // outer wall thickness
     G4double cryoPosX = -38.5 * CLHEP::mm;
     G4double cryoPosY = 0;
+    // separation between inner cryostat and front plate
+    G4double cryoFrontSepZ = 24.27 * CLHEP::mm;
     G4double cryoHalfLength = 100 / 2 * CLHEP::mm;
     G4double cryoStartAngle = 30 * CLHEP::degree;     // angular bounds
     G4double cryoStopAngle = 100 * CLHEP::degree;
@@ -502,7 +504,7 @@ void FCalDetectorConstruction::SetupGeometry()
             Ro, G4ThreeVector(tshiftx[it], tshifty[it], tshiftz[it]));
         assemblyTube->MakeImprint(fpWorldLogical, Tr0);
     }
-
+/*
     ///|////////////////////////////////////////////////////////////////////
 	//|| Tungsten Plate Series
     ///|////////////////////////////////////////////////////////////////////
@@ -619,9 +621,8 @@ void FCalDetectorConstruction::SetupGeometry()
 		0
 	);
     ///| End of Tungsten Plate Series //////////////////////////////////////
-
-    /*
-     ///|////////////////////////////////////////////////////////////////////
+*/
+    ///|////////////////////////////////////////////////////////////////////
     //|| Tungsten Plate Series
     ///|////////////////////////////////////////////////////////////////////
     G4Box* tungPlate = new G4Box("tungPlate",	// Name
@@ -733,7 +734,6 @@ void FCalDetectorConstruction::SetupGeometry()
         0
     );
     ///| End of Tungsten Plate Series //////////////////////////////////////
-    */
 
     ///|////////////////////////////////////////////////////////////////////
     //|| Cryostat
@@ -742,9 +742,13 @@ void FCalDetectorConstruction::SetupGeometry()
     // Position and rotation.
     G4RotationMatrix cryoRotation;
     cryoRotation.rotateX(90 * CLHEP::degree);
+    G4double cryoPosZ = \
+        cryoFrontSepZ
+        + boxZ + 2 * (plateZ + larGThz) * (tungPN - 1) + 2 * plateZ
+        - sqrt(pow(cryoIIRadius, 2) - pow(cryoPosX, 2));
     G4Transform3D cryoTransform = G4Transform3D(
         cryoRotation,
-        G4ThreeVector(cryoPosX, cryoPosY, 0)
+        G4ThreeVector(cryoPosX, cryoPosY, cryoPosZ)
     );
 
     //// Cryostat Inner Wall

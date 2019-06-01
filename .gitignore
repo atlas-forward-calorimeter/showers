@@ -1,6 +1,15 @@
-.vs
-.vscode
+# Typical place to build project.
 build
+# Another place to store data.
 data
+
+# Made by Visual Studio.
+.vs
+out
+
+# Made by Visual Studio Code.
+.vscode
+
+# Made by Python.
 **/__pycache__
 **/.ipynb_checkpoints
