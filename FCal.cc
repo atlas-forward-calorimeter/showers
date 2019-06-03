@@ -22,16 +22,21 @@ Edited by Anson Kost with the help of Professor John Rutherfoord, May 2019.
 
 #include "Randomize.hh"
 
+#include <chrono>
 
 int main(int argc, char** argv)
 {
+    // For timing the whole program.
+    const time_t startTime = time(NULL);
+
     // Detect interactive mode and define UI session.
     G4UIExecutive* ui = 0;
     if (argc == 1)
-    {
         // Let G4UIExecutive guess the best available UI.
         ui = new G4UIExecutive(argc, argv);
-    }
+    else if (strcmp(argv[1], "i") == 0)
+        // Interactive mode with tcsh.
+        ui = new G4UIExecutive(argc, argv, "tcsh");
 
     // Choose the Random engine.
     G4Random::setTheEngine(new CLHEP::RanecuEngine);
@@ -85,6 +90,10 @@ int main(int argc, char** argv)
         ui->SessionStart();
         delete ui;
     }
+
+    const time_t endTime = time(NULL);
+    G4cout << "This run took " << (endTime - startTime) 
+           << " seconds in all. It finished on " << std::ctime(&endTime);
 
     // Job termination.
     // Free the store: user actions, physics_list and detector_description are 

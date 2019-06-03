@@ -1,8 +1,8 @@
-# A test run.
+# A normal run, one beta per event.
 
 /process/em/verbose 0  # Verbosity.
 
 /run/initialize  # Initialize kernel.
 
 /run/setCut 0.001 mm
-/run/beamOn 1
+/run/beamOn 28 # Number of events.

@@ -5,24 +5,14 @@ Author: Zhaoyuan Cui
 */
 
 #include "FCalRunAction.hh"
-#include "FCalAnalysis.hh"
-#include "FCalEmCalorimeterSD.hh"
 
-#include "G4UnitsTable.hh"
-#include "G4SystemOfUnits.hh"
+#include "G4Run.hh"
+#include "G4Event.hh"
 
 
-//// Constructor
-FCalRunAction::FCalRunAction() : G4UserRunAction() {
-    G4cout << "Hi, I'm a new thread." << G4endl;
-}
-
-
-//// Destructor
-FCalRunAction::~FCalRunAction()
-{
-    delete G4AnalysisManager::Instance();
-}
+//// Constructor and Destructor
+FCalRunAction::FCalRunAction() : G4UserRunAction() {}
+FCalRunAction::~FCalRunAction() {}
 
 
 G4Run* FCalRunAction::GenerateRun()
@@ -34,4 +24,4 @@ G4Run* FCalRunAction::GenerateRun()
 void FCalRunAction::BeginOfRunAction(const G4Run*) {}
 
 
-void FCalRunAction::EndOfRunAction(const G4Run*) {}
+void FCalRunAction::EndOfRunAction(const G4Run* run) {}
