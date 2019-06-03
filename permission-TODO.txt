@@ -1,2 +1,4 @@
 Use NIST materials and elements.
 Verify code is working well.
+
+Visualize with a white background.

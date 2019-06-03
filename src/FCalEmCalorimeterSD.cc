@@ -25,9 +25,9 @@ Edited by Anson Kost with the help of Professor John Rutherfoord, May 2019.
 ///|////////////////////////////////////////////////////////////////////////////
 //|| (Repeated) Detector Geometry Parameters
 ///|////////////////////////////////////////////////////////////////////////////
-const int numCals = 4;
+/*  const int numCals = 4;
 const int tungPN = 8;
-const int tungBPN = 4;
+const int tungBPN = 4;  */
 
 
 //// Constructor
@@ -56,8 +56,7 @@ void FCalEmCalorimeterSD::Initialize(G4HCofThisEvent* hce)
 }
 
 
-G4bool FCalEmCalorimeterSD::ProcessHits(G4Step* aStep,
-					G4TouchableHistory*)
+G4bool FCalEmCalorimeterSD::ProcessHits(G4Step* aStep, G4TouchableHistory*)
 {
     G4double edep = aStep->GetTotalEnergyDeposit();  // Energy deposit.
 
@@ -76,19 +75,22 @@ G4bool FCalEmCalorimeterSD::ProcessHits(G4Step* aStep,
 }
 
 
-void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
+void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent* test)
 {
-
+/*
 	///|////////////////////////////////////////////////////////////////////
 	//|| Data Output Filename(s)
 	///|////////////////////////////////////////////////////////////////////
 	std::string hitsFilename = "data/hits.csv";
 
-    G4AnalysisManager* analysisManager = G4AnalysisManager::Instance();
-    G4int eID = 0;
-    const G4Event* evt = G4RunManager::GetRunManager()->GetCurrentEvent();
-    if (evt) eID = evt->GetEventID();
-    G4cout << "Finished processing run " << eID << '.' << G4endl;
+    G4int eventID = 0;
+    const G4Event* theEvent = G4RunManager::GetRunManager()->GetCurrentEvent();
+    if (theEvent)
+        eventID = theEvent->GetEventID();
+    else
+        G4cout << G4endl << G4endl << "No event in EndOfEvent" << G4endl << G4endl;
+
+    G4cout << "EndofEvent: Done with event " << eventID << '.' << G4endl;
 
     G4int nofHits = fHitsCollection->entries();
 
@@ -112,13 +114,14 @@ void FCalEmCalorimeterSD::EndOfEvent(G4HCofThisEvent*)
 
         // Python!
         file << edep << ", " << xdep << ", " << ydep << ", " << zdep
-        /*  << ", " << hit->GetTotalEnergy()
+            << ", " << hit->GetTotalEnergy()
             << ", " << hit->GetMomentum().x()
             << ", " << hit->GetMomentum().y()
             << ", " << hit->GetMomentum().z()
-            << ", " << hit->GetTrackID()  */
+            << ", " << hit->GetTrackID()
             << G4endl;
     }
 
     file.close();
+*/
 }
