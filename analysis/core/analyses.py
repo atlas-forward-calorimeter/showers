@@ -3,11 +3,14 @@
 Written by Anson Kost with the help of Professor John Rutherfoord, May 2019.
 
 """
-
+import os
 import types
 import datetime
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
 
-from .utilities import *
+from .utilities import readFolder, makeBins, binMidpoints, makeHist
 
 ## Settings ##
 fullZlimits = (-50, 80)
@@ -19,7 +22,7 @@ def analysis1(dataPath,
               outPath=None, 
               outFileName='analysis.txt', 
               maxFiles=None):
-    """Make energy-z histograms for events and for runs.
+    """Make energy-z histograms and sum energy deposits for events and for runs.
 
     `dataPath`:     Path to top level data folder containing secondary level 
                     folders of events.

@@ -86,6 +86,7 @@ void FCalEventAction::WriteHits(
     FCalEmCalorimeterHit* hit = 0;
     G4ThreeVector position;
     for (size_t i = 0; i < hitsCollection->GetSize(); i++) {
+        // Loop over hits.
         hit = static_cast<FCalEmCalorimeterHit*>(hitsCollection->GetHit(i));
         position = hit->GetPos();
         fileContents << hit->GetEdep() / CLHEP::MeV
