@@ -4,28 +4,24 @@ import os
 import math
 import numpy as np
 
-def doublePrint(*objs, filePath=None, set=False, **kwargs):
+def printAndWrite(*objs, **kwargs):
     """Print a message and append it to a file at the same time!
     
-     `objs`: Object(s) to print and write.
-    `filePath`: File to write to. Doesn't write to a file by default.
-    
-    `end` and keyword arguments are the same as in the built-in
-    `print`.
+    Print once to the terminal, and then, if the `file` keyword argument
+    is given, print to that file. If `file` is a string, it will be
+    treated as a file path and opened in append mode. Otherwise, `file`
+    is left as is when given to the built-in `print` function.
     
     """
-    if set:
-        doublePrint.filePath = filePath
-    else:
-        print(*objs, **kwargs)
-        if filePath:
-            message = ' '.join(objs) + '\n'
-            with open(filePath, 'a') as file:
-                file.write(message)
-    # except Exception as e:
-    #     print(f"Couldn't write to {filePath}!")
-    #     print(e.message, e.args)
-    #     print('Moving on anyway...')
+    file = kwargs.pop('file', None)
+    print(*objs, **kwargs)
+
+    if file:
+        if isinstance(file, str):
+            with open(file, 'a') as f:
+                print(*objs, file=f, **kwargs)
+        else:
+            print(*objs, file=file, **kwargs)
 
 
 def outTextPath(outDirectory):
@@ -54,5 +50,5 @@ def makeBins(start, end, binDensity=None):
 
 
 def binMidpoints(bins):
-    """Make getting the midpoints of an array of bin endpoints quicker."""
+    """Get midpoints of bins from an array of bin endpoints."""
     return (bins[:-1] + bins[1:]) / 2

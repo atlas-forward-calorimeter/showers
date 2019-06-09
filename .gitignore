@@ -1,6 +1,7 @@
 # Typical place to build project.
 /build/
-# Places to store input data and test data.
+
+# Places to store data.
 # (Any folder anywhere whose name starts with "data").
 data*/
 
