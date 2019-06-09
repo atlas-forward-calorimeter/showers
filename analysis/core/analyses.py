@@ -1,6 +1,7 @@
 """Different analysis functions with specific and general uses.
 
-Written by Anson Kost with the help of Professor John Rutherfoord, May 2019.
+Written by Anson Kost with the help of Professor John Rutherfoord.
+May 2019
 
 """
 

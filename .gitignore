@@ -1,15 +1,16 @@
 # Typical place to build project.
-build
-# Another place to store data.
-data
+/build/
+# Places to store input data and test data.
+# (Any folder anywhere whose name starts with "data").
+data*/
 
 # Made by Visual Studio.
-.vs
-out
+.vs/
+out/
 
 # Made by Visual Studio Code.
-.vscode
+.vscode/
 
 # Made by Python.
-**/__pycache__
-**/.ipynb_checkpoints
+__pycache__/
+.ipynb_checkpoints/
