@@ -114,7 +114,9 @@ class FCalPiece(Piece):
            maxEvents: The maximum number of events per run to analyze.
         
         """
-        name = os.path.split(inputPath)[-1]
+        basePath, name = os.path.split(inputPath)
+        if not name:
+            name = os.path.split(basePath)[-1]
         super().__init__(name=name, parent=parent)
 
         if outDirectory is None and parent:

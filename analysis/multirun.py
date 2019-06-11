@@ -54,7 +54,9 @@ class MultiRun(FCalPiece):
         These directories should contain run data.
         
         """
-        skipDirs = [os.path.split(self.outDirectory)[-1], '.git']
+        skipDirs = ['.git']
+        if self.outDirectory:
+            skipDirs.append(os.path.split(self.outDirectory)[-1])
         for root, dirs, files in os.walk(self.dataDirectory):
             # Skip directories in `skipDirs` 
             # (folders with the name ".git" or the same name as the 

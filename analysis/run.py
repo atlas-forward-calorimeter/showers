@@ -37,10 +37,8 @@ class Run(FCalPiece):
         ## Initialize analysis stuff. ##
 
         # Histogram sums.
-        self.zFullSums = np.zeros(len(self.fullBinMids))
-        self.xyMiddleSums = np.zeros(
-            2 * (len(self.xyBinMids),)
-        )
+        self.zFullSumss = []
+        self.xyMiddleSumss = []
 
         # Energy sums.
         self.fullEdeps, self.middleEdeps = [], []
@@ -70,8 +68,8 @@ class Run(FCalPiece):
         """Update the run per event."""
         self.fullEdeps.append(event.fullEdep)
         self.middleEdeps.append(event.middleEdep)
-        self.zFullSums += event.zFullSums
-        self.xyMiddleSums += event.xyMiddleSums
+        self.zFullSumss.append(event.zFullSums)
+        self.xyMiddleSumss.append(event.xyMiddleSums)
 
     def analyze(self):
         """Calculate averages over the run and plot them."""
@@ -101,6 +99,15 @@ class Run(FCalPiece):
 
         # Finish run histograms.
 
+        zFullSumss = np.array(self.zFullSumss)
+        xyMiddleSumss = np.array(self.xyMiddleSumss)
+        # Bin sum averages.
+        zMeanFullSums = np.mean(zFullSumss, axis=0)
+        xyMeanMiddleSums = np.mean(xyMiddleSumss, axis=0)
+        # Bin standard deviations.
+        zFullSumsSigmas = np.std(zFullSumss, axis=0)
+        # xyMiddleSumsSigmas = np.std(xyMiddleSumss, axis=0)
+
         # Event energy-z.
         eventHistFilename = f'{self.name}-EventHist.{self.plotFileFormat}'
         if self.outDirectory:
@@ -112,7 +119,9 @@ class Run(FCalPiece):
         plt.title(f'Histogram - Energy Deposit vs. z - Sum - Run {self.name}')
         plt.xlabel('z')
         plt.ylabel('Energy Deposit Per Bin')
-        plt.plot(self.fullBinMids, self.zFullSums)
+        plt.plot(self.fullBinMids, zMeanFullSums, lw=0.6)
+        plt.plot(self.fullBinMids, zMeanFullSums - zFullSumsSigmas, lw=0.5)
+        plt.plot(self.fullBinMids, zMeanFullSums + zFullSumsSigmas, lw=0.5)
         ezHistFilename = f'{self.name}-Hist.{self.plotFileFormat}'
         if self.outDirectory:
             plt.savefig(
@@ -124,7 +133,7 @@ class Run(FCalPiece):
         plt.xlabel('x')
         plt.ylabel('y')
         gridX, gridY = np.meshgrid(self.xyBins, self.xyBins)
-        plt.pcolormesh(gridX, gridY, self.xyMiddleSums)
+        plt.pcolormesh(gridX, gridY, xyMeanMiddleSums)
         # if self.outDirectory:
         #    xyHistFilename = f'{self.name}-xyHist.{self.plotFileFormat}'
         #    plt.savefig(

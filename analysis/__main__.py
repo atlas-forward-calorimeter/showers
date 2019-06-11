@@ -17,7 +17,7 @@ if not args:
     # Currently runs a test.
     mr = MultiRun('analysis\\tests\\data')
     mr.go()
-elif len(args) == 1:
-    # Command line argument should be the path of the directory to analyze.
-    mr = MultiRun(args[0])
+else:
+    # Command line arguments are passed to `MultiRun` constructor.
+    mr = MultiRun(*args)
     mr.go()
