@@ -12,6 +12,9 @@ out/
 # Made by Visual Studio Code.
 .vscode/
 
+# Made by PyCharm.
+.idea/
+
 # Made by Python.
 __pycache__/
 .ipynb_checkpoints/

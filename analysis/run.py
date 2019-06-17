@@ -39,6 +39,9 @@ class Run(FCalPiece):
         # Histogram sums.
         self.zFullSumss = []
         self.xyMiddleSumss = []
+        self.zMeanFullSums = None
+        self.xyMeanMiddleSums = None
+        self.zFullSumSigmas = None
 
         # Energy sums.
         self.fullEdeps, self.middleEdeps = [], []
@@ -102,13 +105,13 @@ class Run(FCalPiece):
         zFullSumss = np.array(self.zFullSumss)
         xyMiddleSumss = np.array(self.xyMiddleSumss)
         # Bin sum averages.
-        zMeanFullSums = np.mean(zFullSumss, axis=0)
-        xyMeanMiddleSums = np.mean(xyMiddleSumss, axis=0)
+        self.zMeanFullSums = np.mean(zFullSumss, axis=0)
+        self.xyMeanMiddleSums = np.mean(xyMiddleSumss, axis=0)
         # Bin standard deviations.
-        zFullSumsSigmas = np.std(zFullSumss, axis=0)
-        # xyMiddleSumsSigmas = np.std(xyMiddleSumss, axis=0)
+        self.zFullSumsSigmas = np.std(zFullSumss, axis=0)
+        # self.xyMiddleSumsSigmas = np.std(xyMiddleSumss, axis=0)
 
-        # Event energy-z.
+        # Individual event energy-z.
         eventHistFilename = f'{self.name}-EventHist.{self.plotFileFormat}'
         if self.outDirectory:
             plt.savefig(
@@ -119,9 +122,9 @@ class Run(FCalPiece):
         plt.title(f'Histogram - Energy Deposit vs. z - Sum - Run {self.name}')
         plt.xlabel('z')
         plt.ylabel('Energy Deposit Per Bin')
-        plt.plot(self.fullBinMids, zMeanFullSums, lw=0.6)
-        plt.plot(self.fullBinMids, zMeanFullSums - zFullSumsSigmas, lw=0.5)
-        plt.plot(self.fullBinMids, zMeanFullSums + zFullSumsSigmas, lw=0.5)
+        plt.plot(self.fullBinMids, self.zMeanFullSums, lw=0.6)
+        plt.plot(self.fullBinMids, self.zMeanFullSums - self.zFullSumsSigmas, lw=0.5)
+        plt.plot(self.fullBinMids, self.zMeanFullSums + self.zFullSumsSigmas, lw=0.5)
         ezHistFilename = f'{self.name}-Hist.{self.plotFileFormat}'
         if self.outDirectory:
             plt.savefig(
@@ -133,12 +136,12 @@ class Run(FCalPiece):
         plt.xlabel('x')
         plt.ylabel('y')
         gridX, gridY = np.meshgrid(self.xyBins, self.xyBins)
-        plt.pcolormesh(gridX, gridY, xyMeanMiddleSums)
-        # if self.outDirectory:
-        #    xyHistFilename = f'{self.name}-xyHist.{self.plotFileFormat}'
-        #    plt.savefig(
-        #        os.path.join(self.outDirectory, xyHistFilename), 
-        #        format=self.plotFileFormat)
+        plt.pcolormesh(gridX, gridY, self.xyMeanMiddleSums)
+        if self.outDirectory:
+           xyHistFilename = f'{self.name}-xyHist.{self.plotFileFormat}'
+           plt.savefig(
+               os.path.join(self.outDirectory, xyHistFilename),
+               format=self.plotFileFormat)
    
     def smallerPieces(self):
         """Get every event file in `dataDirectory`."""
