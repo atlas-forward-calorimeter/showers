@@ -1,21 +1,23 @@
-"""Define command line run behavior.
-
-Written by Anson Kost with the help of Professor John Rutherfoord, May 2019.
-
-"""
+"""This runs when the analysis package is run from the command line."""
 
 import sys
+import os
 
-if __name__ == '__main__':
-    from core import analysis1
+# Add the analysis package to the system path.
+sys.path.insert(
+    0, 
+    os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+)
 
-    if (len(sys.argv) == 1):
-        # Testing only.
-        print('Running from command line without arguments. This is for '
-              'testing only.')
-        analysis1('data')
+from analysis import MultiRun
 
-    else:
-        # Analyze given folder.
-        assert(len(sys.argv) == 2)
-        analysis1(sys.argv[1])
+args = sys.argv[1:]  # Command line arguments.
+if not args:
+    # Default behavior with no arguments.
+    # Currently runs a test.
+    mr = MultiRun('analysis\\tests\\data')
+    mr.go()
+else:
+    # Command line arguments are passed to `MultiRun` constructor.
+    mr = MultiRun(*args)
+    mr.go()

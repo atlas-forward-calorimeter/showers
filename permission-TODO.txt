@@ -2,3 +2,5 @@ Use NIST materials and elements.
 Verify code is working well.
 
 Visualize with a white background.
+
+Test histograms, add config file, output to pandas.
