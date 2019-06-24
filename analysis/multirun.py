@@ -39,6 +39,7 @@ class MultiRun(FCalPiece):
             # Create output directory
             # (and overwrite any existing analysis).
             os.makedirs(self.outDirectory, exist_ok=True)
+            print('Creating out directory.')
         
         # Analysis Header
         analysisHeader = (

@@ -36,6 +36,10 @@ class Run(FCalPiece):
 
         ## Initialize analysis stuff. ##
 
+        # Multiple event plot.
+        self.fig = None
+        self.ax = None
+
         # Histogram sums.
         self.zFullSumss = []
         self.xyMiddleSumss = []
@@ -52,20 +56,35 @@ class Run(FCalPiece):
         self.meanMiddleEdep = 0
         self.middleEdepSigma = 0
 
+        # Histogram limits.
+
+        if "350GeV" in self.name:
+            self.histYlim = 70
+        else:
+            self.histYlim = 35
+
+        self.middleHistYlim = self.histYlim / 20
+
         self.start()
     
     def start(self):
-        """Like a constructor, but for analysis and output."""        
+        """Like a constructor, but for analysis and output."""
+        if self.outDirectory:
+            # Create output directory
+            # (and overwrite any existing analysis).
+            os.makedirs(self.outDirectory, exist_ok=True)
+
         # Run Header
         runHeader = f'\nBegin of run {self.name}.\n'
-        printAndWrite(runHeader, file=self.outTextPath)
+        printAndWrite(runHeader, file=self.parent.outTextPath)
 
         # Multiple event histogram figure and formatting.
-        plt.figure()
-        plt.title('Histogram - Energy Deposit vs. z'
+        self.fig, self.ax = plt.subplots()
+        self.ax.set_title('Histogram - Energy Deposit vs. z'
                   f' - Events - Run {self.name}')
-        plt.xlabel('z')
-        plt.ylabel('Energy Deposit Per Bin')
+        self.ax.set_xlabel('z')
+        self.ax.set_ylabel('Energy Deposit Per Bin')
+        self.ax.set_ylim(0, self.histYlim)
     
     def analyzeEvent(self, event):
         """Update the run per event."""
@@ -98,7 +117,7 @@ class Run(FCalPiece):
 
         # Run Footer
         footer = f'\nEnd of run {self.name}.\n'
-        printAndWrite(output + footer, file=self.outTextPath)
+        printAndWrite(output + footer, file=self.parent.outTextPath)
 
         # Finish run histograms.
 
@@ -111,24 +130,29 @@ class Run(FCalPiece):
         self.zFullSumsSigmas = np.std(zFullSumss, axis=0)
         # self.xyMiddleSumsSigmas = np.std(xyMiddleSumss, axis=0)
 
-        # Individual event energy-z.
+        # Multiple event energy-z.
         eventHistFilename = f'{self.name}-EventHist.{self.plotFileFormat}'
-        if self.outDirectory:
-            plt.savefig(
-                os.path.join(self.outDirectory, eventHistFilename), 
+        if self.parent.outDirectory:
+            self.fig.savefig(
+                os.path.join(self.parent.outDirectory, eventHistFilename),
                 format=self.plotFileFormat)
+
+        # Close multiple event energy-z.
+        plt.close(self.fig)
+
         # Energy-z.
         plt.figure()
         plt.title(f'Histogram - Energy Deposit vs. z - Sum - Run {self.name}')
         plt.xlabel('z')
         plt.ylabel('Energy Deposit Per Bin')
+        plt.ylim(0, self.histYlim)
         plt.plot(self.fullBinMids, self.zMeanFullSums, lw=0.6)
         plt.plot(self.fullBinMids, self.zMeanFullSums - self.zFullSumsSigmas, lw=0.5)
         plt.plot(self.fullBinMids, self.zMeanFullSums + self.zFullSumsSigmas, lw=0.5)
         ezHistFilename = f'{self.name}-Hist.{self.plotFileFormat}'
-        if self.outDirectory:
+        if self.parent.outDirectory:
             plt.savefig(
-                os.path.join(self.outDirectory, ezHistFilename), 
+                os.path.join(self.parent.outDirectory, ezHistFilename),
                 format=self.plotFileFormat)
         # Energy-xy.
         plt.figure()
@@ -137,10 +161,10 @@ class Run(FCalPiece):
         plt.ylabel('y')
         gridX, gridY = np.meshgrid(self.xyBins, self.xyBins)
         plt.pcolormesh(gridX, gridY, self.xyMeanMiddleSums)
-        if self.outDirectory:
+        if self.parent.outDirectory:
            xyHistFilename = f'{self.name}-xyHist.{self.plotFileFormat}'
            plt.savefig(
-               os.path.join(self.outDirectory, xyHistFilename),
+               os.path.join(self.parent.outDirectory, xyHistFilename),
                format=self.plotFileFormat)
    
     def smallerPieces(self):

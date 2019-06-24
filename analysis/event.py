@@ -1,5 +1,6 @@
 """The `Event` class."""
 
+import os
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -13,6 +14,7 @@ class Event(FCalPiece):
     One level higher than a run. The top level.
     
     """
+
     def __init__(self, filePath, outDirectory=None, parent=None):
         """filePath: Path to this event's data file."""
         super().__init__(filePath, outDirectory=outDirectory, parent=parent)
@@ -23,6 +25,34 @@ class Event(FCalPiece):
         self.middleEdep = 0
         self.zFullSums = None
         self.xyMiddleSums = None
+
+        # Single event plot.
+        self.fig = None
+        self.ax = None
+        self.ax2 = None
+
+        # Histogram limits.
+
+        if "350GeV" in self.parent.name:
+            self.histYlim = 70
+        else:
+            self.histYlim = 35
+
+        self.middleHistYlim = self.histYlim / 20
+
+        self.start()
+
+    def start(self):
+        """Like a constructor, but for analysis and output."""
+        self.fig, self.ax = plt.subplots()
+        self.ax.set_title('Energy Deposit vs. z'
+                       f'-Run {self.parent.name}-Event {self.name}')
+        self.ax.set_xlabel('z')
+        self.ax.set_ylabel('Energy Deposit Per Bin')
+        self.ax.set_ylim(0, self.histYlim)
+
+        self.ax2 = self.ax.twinx()
+        self.ax2.set_ylim(0, self.middleHistYlim)
     
     def analyze(self):
         """Calculations and plots per event."""
@@ -49,13 +79,30 @@ class Event(FCalPiece):
             self.parent.analyzeEvent(self)
 
         # Plot event histogram.
-        plt.plot(self.fullBinMids, self.zFullSums, lw=0.5)
+        tubeSlice = np.abs(self.fullBinMids) < self.tubeZ
+        platesSlice = np.logical_not(tubeSlice)
+        tubesPlot = (self.fullBinMids[tubeSlice], self.zFullSums[tubeSlice])
+        platesPlot = (self.fullBinMids[platesSlice], self.zFullSums[platesSlice])
+
+        self.parent.ax.plot(self.fullBinMids, self.zFullSums, lw=0.5)
+
+        self.ax.plot(*platesPlot, lw=0.5)
+        self.ax2.plot(*tubesPlot, lw=0.5)
+
+        # Save it.
+        singleEventHistFilename = f'{self.name}-Hist.{self.plotFileFormat}'
+        if self.parent.outDirectory:
+            self.fig.savefig(
+                os.path.join(self.parent.outDirectory, singleEventHistFilename),
+                format=self.plotFileFormat)
+
+        # Close figure.
+        plt.close(self.fig)
 
         # Print stuff.
-
         output = (
             f'Event {self.name}.\n'
             f'fullEdep: {self.fullEdep}.\n'
             f'middleEdep: {self.middleEdep}.'
         )
-        printAndWrite(output, file=self.outTextPath)
+        printAndWrite(output, file=self.parent.parent.outTextPath)

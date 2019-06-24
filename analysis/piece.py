@@ -119,20 +119,20 @@ class FCalPiece(Piece):
             name = os.path.split(basePath)[-1]
         super().__init__(name=name, parent=parent)
 
-        if outDirectory is None and parent:
-            # Propagate output paths from parent.
-            outDirectory = parent.outDirectory
-            outTextPath = parent.outTextPath
-        else:
-            if outDirectory is None:
-                # By default, output to the directory
-                # `inputPath`/analysis.
-                outDirectory = os.path.join(inputPath, 'analysis')
-            if outDirectory:
-                # Write output text to `outDirectory`/analysis.txt.
-                outTextPath = os.path.join(outDirectory, 'analysis.txt')
+        if outDirectory is None:
+            if parent:
+                # Propagate output paths from parent.
+                if parent.outDirectory:
+                    outDirectory = os.path.join(parent.outDirectory, name)
             else:
-                outTextPath = None
+                # No parent.
+                outDirectory = os.path.join(inputPath, 'analysis')
+
+        if outDirectory:
+            # By default, write output text to `outDirectory`/analysis.txt.
+            outTextPath = os.path.join(outDirectory, 'analysis.txt')
+        else:
+            outTextPath = None
         
         if maxEvents is None:
             if parent:
