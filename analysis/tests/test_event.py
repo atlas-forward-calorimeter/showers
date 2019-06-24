@@ -15,7 +15,7 @@ class TestEvent(unittest.TestCase):
         # Create and analyze a test event.
         self.event = Event(
             os.path.join(context.testsDir, 'data', 'run1', 'hits-0.csv'),
-            outDirectory=False
+            out_dir=False
         )
         self.event.go()
     
