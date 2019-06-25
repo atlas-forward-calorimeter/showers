@@ -94,7 +94,9 @@ class FCalPiece(Piece):
     xyLims = 7
     binDensity = 10
     xyBinDensity = 10
-    plotFileFormat = 'svg'
+    plotFileFormat = 'jpg'
+    lengthUnits = 'mm'
+    energyUnits = 'MeV'
 
     # Analysis numbers derived from above numbers.
     fullBins = makeBins(*fullZlims, binDensity)

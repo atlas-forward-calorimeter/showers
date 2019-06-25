@@ -38,7 +38,7 @@ class Event(FCalPiece):
         else:
             self.histYlim = 35
 
-        self.middleHistYlim = self.histYlim / 20
+        self.middleHistYlim = self.histYlim / 15
 
         self.start()
 
@@ -47,8 +47,8 @@ class Event(FCalPiece):
         self.fig, self.ax = plt.subplots()
         self.ax.set_title('Energy Deposit vs. z'
                        f'-Run {self.parent.name}-Event {self.name}')
-        self.ax.set_xlabel('z')
-        self.ax.set_ylabel('Energy Deposit Per Bin')
+        self.ax.set_xlabel(f'z ({self.lengthUnits})')
+        self.ax.set_ylabel(f'Energy Deposit Per Bin ({self.energyUnits})')
         self.ax.set_ylim(0, self.histYlim)
 
         self.ax2 = self.ax.twinx()

@@ -58,17 +58,21 @@ void FCalEmCalorimeterSD::Initialize(G4HCofThisEvent* hce)
 
 G4bool FCalEmCalorimeterSD::ProcessHits(G4Step* aStep, G4TouchableHistory*)
 {
-    G4double edep = aStep->GetTotalEnergyDeposit();  // Energy deposit.
+    G4double edep = aStep->GetTotalEnergyDeposit();
+    G4StepPoint* postStepPoint = aStep->GetPostStepPoint();
+    G4Track* track = aStep->GetTrack();
 
     if (edep == 0.) return false;  // Skip if no energy deposit.
 
     FCalEmCalorimeterHit* newHit = new FCalEmCalorimeterHit();
 
     newHit->SetEdep(edep);
-    newHit->SetPos(aStep->GetPostStepPoint()->GetPosition());
-    // newHit->SetMomentum(aStep->GetPostStepPoint()->GetMomentum());
-    // newHit->SetTotalEnergy(aStep->GetPostStepPoint()->GetTotalEnergy());
-    // newHit->SetTrackID(aStep->GetTrack()->GetTrackID());
+    newHit->SetPos(postStepPoint->GetPosition());
+    newHit->SetKineticEnergy(postStepPoint->GetKineticEnergy());
+    newHit->SetParticleName(track->GetParticleDefinition()->GetParticleName());
+    // newHit->SetMomentum(postStepPoint->GetMomentum());
+    // newHit->SetTotalEnergy(postStepPoint->GetTotalEnergy());
+    newHit->SetTrackID(track->GetTrackID());
 
     fHitsCollection->insert(newHit);
     return true;

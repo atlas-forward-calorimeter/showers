@@ -76,7 +76,7 @@ void FCalEventAction::WriteHits(
     }
 
     // Data column headers.
-    G4String header = "energy_deposit,x,y,z";
+    G4String header = "energy_deposit,x,y,z,particle_name,track_id,kinetic_energy";
 
     // Write to a stringstream first (for speed).
 
@@ -93,6 +93,9 @@ void FCalEventAction::WriteHits(
                      << ',' << position.x() / CLHEP::mm
                      << ',' << position.y() / CLHEP::mm
                      << ',' << position.z() / CLHEP::mm
+                     << ',' << hit->GetParticleName()
+                     << ',' << hit->GetTrackID()
+                     << ',' << hit->GetKineticEnergy() / CLHEP::MeV
                      << G4endl;
     }
 
@@ -101,5 +104,5 @@ void FCalEventAction::WriteHits(
     outFile << fileContents.rdbuf();
     outFile.close();
 
-    G4cout << "Wrote to " << filePath << '.';
+    G4cout << "Wrote to " << filePath << '.' << G4endl;
 }
