@@ -171,4 +171,4 @@ class Run(FCalPiece):
         """Get every event file in `dataDirectory`."""
         root, dirs, files = next(os.walk(self.dataDirectory))
         for file in files[:self.maxEvents]:  # Max number of events.
-            yield Event(hits_data=os.path.join(root, file), prefix=self)
+            yield Event(hits_path=os.path.join(root, file), params=self)
