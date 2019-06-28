@@ -1,5 +1,8 @@
 """Energy calculations and histograms."""
 
+# TODO: Consider moving save paths to the save methods;
+#  but this isn't necessary.
+
 import abc
 import collections
 import functools
@@ -7,6 +10,7 @@ import math
 import os
 
 import numpy
+import pandas
 from matplotlib import pyplot
 
 _default_bin_density = 10
@@ -21,19 +25,79 @@ _default_middle_z_lims = (-8 / 2, 8 / 2)
 _default_xy_lims = 2 * ((-20 / 2, 20 / 2),)
 _default_xy_hist_z_lims = _default_middle_z_lims
 
-_format = 'jpg'
+_image_format = 'jpg'
+_data_format = 'csv'
 _linewidth = 0.5
 
 SplitZResults = collections.namedtuple('SplitZResults', 'full tubes middle')
 
 
-class Histogram(abc.ABC):
+class Calc(abc.ABC):
+    """
+    A base for calculations and presentations of results a certain
+    kind.
+
+    Attributes:
+        resultss: A collection of the results.
+    """
+
+    def __init__(self):
+        self.resultss = []
+
+    def get(self, i=None):
+        """
+        Get the ith set of results kept in resultss. By default, make
+        sure that resultss contains only one entry, then return it.
+
+        :param i: The index of the results to get.
+        :type i: int or None
+        :return: Results.
+        :rtype:
+        """
+        if i is None:
+            self._assert_single_entry()
+
+            return self.resultss[0]
+
+        return self.resultss[i]
+
+    def _assert_single_entry(self):
+        """Make sure only one set of results has been added."""
+        assert len(self.resultss) == 1, \
+            "This Calc container has more than one set of results."
+
+    @abc.abstractmethod
+    def add_data(self, data):
+        """
+        Calculate results from data and keep them.
+
+        :param data: Hits data.
+        :type data: pandas.DataFrame
+        :return: Histogram sums.
+        :rtype: numpy.ndarray
+        """
+
+    @abc.abstractmethod
+    def add_results(self, results):
+        """
+        Add some already calculated results (after optionally making
+        sure they are good results).
+
+        :param results: Results to add.
+        :type results: numpy.ndarray
+        :return:
+        :rtype: None
+        """
+
+
+class Histogram(Calc):
     """
     Base histogram class.
 
     Attributes:
-        sumss: Collection of all histogram sums.
+        resultss: Collection of all histogram sums.
     """
+    # TODO: Close figures.
 
     def __init__(self, save_name=None, save_dir=None, bin_density=None,
                  dpi=None, energy_units=None, length_units=None):
@@ -46,16 +110,17 @@ class Histogram(abc.ABC):
         :param length_units: Length dimensions.
         :type length_units: str or None
         :param save_name: Name of saved figure files. Suffixes are added.
+            Figures are only saved when save_dir is given.
         :type save_name: str or None
-        :param save_dir: Save figures to this directory.
+        :param save_dir: Save figures to this directory, and only save
+            when this is given (since Event and Run also work that way).
         :type save_dir: str or None
         :param dpi: Pixels per inch for saved figures.
         :type dpi: int or None
         """
-        self.sumss = []
+        super().__init__()
 
         # defaults
-
         self.bin_density = _default_bin_density if bin_density is None \
             else bin_density
         self.dpi = _default_dpi if dpi is None else dpi
@@ -64,20 +129,9 @@ class Histogram(abc.ABC):
         self.length_units = _default_length_units if length_units is None \
             else length_units
 
-        if save_name is None:
-            assert save_dir is None, (
-                "Please give a save filename if you would like to"
-                " save figures."
-            )
-            self.save_name = None
-            self.save_dir = None
-        else:
-            self.save_name = save_name
-            if save_dir is None:
-                self.save_dir = ''
-            else:
-                self.save_dir = save_dir
-
+        self.save_name, self.save_dir = _default_save_params(
+            save_name, save_dir
+        )
         ####
 
     def save_fig(self, fig, file_suffix):
@@ -91,7 +145,8 @@ class Histogram(abc.ABC):
         :return: File path of the saved figure.
         :rtype: str
         """
-        if self.save_name is None:
+        # Only save when save_dir is given.
+        if self.save_dir is None:
             return None
 
         if file_suffix is None:
@@ -99,11 +154,11 @@ class Histogram(abc.ABC):
         else:
             save_name = '_'.join((self.save_name, file_suffix))
 
-        filename = '.'.join((save_name, _format))
+        filename = '.'.join((save_name, _image_format))
         filepath = os.path.join(self.save_dir, filename)
 
         fig.savefig(
-            filepath, dpi=self.dpi, format=_format, bbox_inches='tight'
+            filepath, dpi=self.dpi, format=_image_format, bbox_inches='tight'
         )
 
         return filepath
@@ -120,36 +175,30 @@ class Histogram(abc.ABC):
         """
         return array * self.bin_density
 
-    @abc.abstractmethod
-    def add_data(self, data):
+    def plot_single(self, i=None):
         """
-        Calculate sums from data and keep them.
+        Plot the ith set of sums kept in sumss. By default, make sure
+        that sumss has only one entry, then plot it.
 
-        :param data: Hits data.
-        :type data: pandas.DataFrame
-        :return: Histogram sums.
-        :rtype: numpy.ndarray
-        """
-
-    @abc.abstractmethod
-    def add_sums(self, sums):
-        """
-        Add some already calculated sums after making sure they are good
-        sums.
-
-        :param sums: Histogram sums to add.
-        :type sums: numpy.ndarray
-        :return:
-        :rtype: None
-        """
-
-    @abc.abstractmethod
-    def plot_single(self, i=0):
-        """
-        Plot the ith set of kept sums.
-
-        :param i: Index, defaults to 0.
+        :param i: The index.
         :type i: int
+        :return: New figure and axis/axes.
+        :rtype: tuple
+        """
+        if i is None:
+            self._assert_single_entry()
+
+            return self.plot_single_sums(self.resultss[0])
+
+        return self.plot_single_sums(self.resultss[i])
+
+    @abc.abstractmethod
+    def plot_single_sums(self, sums):
+        """
+        Plot a lone set of histogram sums.
+
+        :param sums: Histogram sums.
+        :type sums: numpy.ndarray
         :return: New figure and axis/axes.
         :rtype: tuple
         """
@@ -210,7 +259,7 @@ class EnergyVsZ(Histogram):
         self._title = 'Energy vs. z.' if title is None else title
         ####
 
-        self._bins = make_bins(
+        self._bins = _make_bins(
             self._z_lims[0], self._z_lims[1], self.bin_density
         )
 
@@ -218,20 +267,18 @@ class EnergyVsZ(Histogram):
         sums, _ = numpy.histogram(
             data.z, bins=self._bins, weights=data.energy_deposit
         )
-        self.sumss.append(sums)
+        self.resultss.append(sums)
 
         return sums
 
-    def add_sums(self, sums):
+    def add_results(self, sums):
         assert len(sums) == (len(self._bins) - 1), \
             "Tried to add funny sums."
 
-        self.sumss.append(sums)
+        self.resultss.append(sums)
 
-    def plot_single(self, i=0):
-        sums = self.sumss[i]
-
-        bin_mids = make_bin_midpoints(self._bins)
+    def plot_single_sums(self, sums):
+        bin_mids = _make_bin_midpoints(self._bins)
 
         fig, ax, ax_middle = self.new_fig_and_axes()
         fig.suptitle(self._title)
@@ -302,7 +349,7 @@ class EnergyVsXY(Histogram):
         #
 
         self._binss = tuple(
-            make_bins(limits[0], limits[1], self.bin_density)
+            _make_bins(limits[0], limits[1], self.bin_density)
             for limits in self._xy_lims
         )
 
@@ -313,22 +360,21 @@ class EnergyVsXY(Histogram):
         sums, _, _ = numpy.histogram2d(
             sliced.x, sliced.y, bins=self._binss, weights=sliced.energy_deposit
         )
-        self.sumss.append(sums)
+        self.resultss.append(sums)
 
         return sums
 
-    def add_sums(self, sums):
-        assert numpy.all(numpy.equal(
-            sums.shape,
-            (len(self._binss[0]), len(self._binss[1]))
-        ))
+    def add_results(self, sums):
+        if self.resultss:
+            assert numpy.all(numpy.equal(
+                sums.shape,
+                tuple(len(bins) - 1 for bins in self._binss)
+            ))
 
-        self.sumss.append(sums)
+        self.resultss.append(sums)
 
-    def plot_single(self, i=0):
-        sums = self.sumss[i]
-
-        bin_midss = (make_bin_midpoints(bins) for bins in self._binss)
+    def plot_single_sums(self, sums):
+        # bin_midss = (_make_bin_midpoints(bins) for bins in self._binss)
 
         fig, ax = self.new_fig_and_axes()
         fig.suptitle(self._title)
@@ -350,26 +396,114 @@ class EnergyVsXY(Histogram):
         return fig, ax
 
 
-class SplitZ:
+class Numbers(Calc):
     """
-    Calculation of energy deposit mean and std dev on sections of
-    data split up along z.
+    The numbers don't lie.
+
+    This class manages calculations of different numbers from the data
+    and writes them to files.
 
     Attributes:
-        resultss: Collection of all results.
+        resultss: Collection of all results. Results are dicts.
     """
 
-    def __init__(self):
-        self.resultss = []
-
-    def add_data(self, data):
+    def __init__(self, save_name=None, save_dir=None):
         """
-        Calculate results from energy deposit data and keep them.
+
+        :param save_name: See Histogram.
+        :type save_name:
+        :param save_dir: See Histogram.
+        :type save_dir:
+        """
+        super().__init__()
+
+        self.dataframe_resultss = None
+
+        self._save_name, self._save_dir = _default_save_params(
+            save_name, save_dir
+        )
+
+    def add_data(self, data, tags=None):
+        """
+
+        :param data:
+        :type data:
+        :param tags: Extra result values for tagging a result entry.
+        :type tags: dict or None
+        :return:
+        :rtype:
+        """
+        new_results = collections.OrderedDict()
+
+        if tags is not None:
+            new_results.update(tags)
+
+        new_results.update(self._split_z(data))
+        self.resultss.append(new_results)
+
+        return new_results
+
+    def add_results(self, results):
+        assert len(results) <= 5, "Tried to add funny results."
+
+        self.resultss.append(results)
+
+    def append_mean_and_dev(self, mean_tags=None, dev_tags=None):
+        """
+        Append mean and standard deviation entries to the collection of
+        results.
+
+        :param mean_tags: Tags to use for the new means entry.
+        :type mean_tags: dict
+        :param dev_tags: Tags to use for the new dev entry.
+        :type dev_tags: dict
+        :return:
+        :rtype:
+        """
+        assert self.resultss, \
+            "Can't take the mean and standard deviation of" \
+            " nonexistent `resultss`."
+
+        df_resultss = pandas.DataFrame(self.resultss)
+
+        means = df_resultss.mean().to_dict()
+        devs = df_resultss.std().to_dict()
+
+        if mean_tags:
+            means.update(mean_tags)
+        if dev_tags:
+            devs.update(dev_tags)
+
+        self.add_results(means)
+        self.add_results(devs)
+
+    def save(self):
+        """
+        Save results to a file that can be read by pandas, Excel, etc.
+        if _save_dir is set.
+
+        :return: Path to saved results file.
+        :rtype: str
+        """
+        if self._save_dir is None:
+            return None
+
+        filename = '.'.join((self._save_name, _data_format))
+        filepath = os.path.join(self._save_dir, filename)
+        pandas.DataFrame(self.resultss).to_csv(filepath, index=False)
+
+        return filepath
+
+    @staticmethod
+    def _split_z(data):
+        """
+        Calculate energy deposit mean and std dev on sections of
+        data split up along z.
 
         :param data: Hits data.
         :type data: pandas.DataFrame
-        :return: New results. (total, tubes, middle tubes)
-        :rtype: (float, float, float)
+        :return: Calculation results.
+        :rtype: dict
         """
         tube_indices = numpy.logical_and(
             _default_tube_z_lims[0] <= data.z,
@@ -379,34 +513,18 @@ class SplitZ:
             _default_middle_z_lims[0] <= data.z,
             data.z <= _default_middle_z_lims[1]
         )
-        results = SplitZResults(*tuple(
-            numpy.sum(data.energy_deposit[indices])
-            for indices in (slice(None), tube_indices, middle_indices)
-        ))
-        self.resultss.append(results)
-
-        return results
-
-    def add_results(self, results):
-        """
-        Add some already calculated results.
-
-        :param results: Results to add. See add_data.
-        :type results: tuple
-        :return:
-        :rtype:
-        """
-        assert len(results) == 3, "Tried to add funny results."
-
-        self.resultss.append(results)
-
-    def get(self, i=0):
-        """Get the ith set of results."""
-        return self.resultss[i]
+        return {
+            'full_e_dep':
+                data.energy_deposit.sum(),
+            'tubes_e_dep':
+                data.energy_deposit[tube_indices].sum(),
+            'middle_e_dep':
+                data.energy_deposit[middle_indices].sum(),
+        }
 
 
 @functools.lru_cache()
-def make_bins(start, end, bin_density):
+def _make_bins(start, end, bin_density):
     """
     Make histogram bins with a given bin density.
 
@@ -432,12 +550,12 @@ def make_bins(start, end, bin_density):
 
 
 # @functools.lru_cache()
-def make_bin_midpoints(bins):
+def _make_bin_midpoints(bins):
     """Get midpoints of histogram bins."""
     return (bins[:-1] + bins[1:]) / 2
 
 
-def range2indices(array, range_lims):
+def _range2indices(array, range_lims):
     """
     Find the values of an array that are inclusively within range_lims.
 
@@ -450,6 +568,26 @@ def range2indices(array, range_lims):
     :rtype: numpy.ndarray
     """
     return numpy.logical_and(range_lims[0] <= array, array <= range_lims[1])
+
+
+def _default_save_params(save_name, save_dir):
+    """
+    Require save_name if save_dir is given.
+
+    :param save_name: Name of file to save.
+    :type save_name: str or None
+    :param save_dir: Directory to save to.
+    :type save_dir: str or None
+    :return: save_name, save_dir
+    :rtype: (str, str)
+    """
+    if save_dir is not None:
+        assert save_name is not None, (
+            "Please give a save filename if you would like to"
+            " save figures."
+        )
+
+    return save_name, save_dir
 
 
 def _split_plot(x, y, split_lims, ax1, ax2, kwargs1=None, kwargs2=None):
@@ -482,7 +620,7 @@ def _split_plot(x, y, split_lims, ax1, ax2, kwargs1=None, kwargs2=None):
     if kwargs2 is None:
         kwargs2 = {}
 
-    inside_indices = range2indices(x, split_lims)
+    inside_indices = _range2indices(x, split_lims)
     outside_indices = numpy.logical_not(inside_indices)
 
     ax1.plot(x[inside_indices], y[inside_indices], **kwargs1)
