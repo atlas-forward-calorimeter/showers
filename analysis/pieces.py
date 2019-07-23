@@ -1,6 +1,7 @@
-"""Analyzing data in "pieces. Events, Runs, etc."""
+"""Analyzing data in "pieces." Events, Runs, etc."""
 
 import abc
+import collections
 import os
 
 import pandas
@@ -25,27 +26,49 @@ class Piece(abc.ABC):
         hists: Contains all of the Histograms.
     """
 
-    def __init__(self, input_path, out_dir=None, params=None):
+    def __init__(self, input_path, parent=None, out_dir=None, info=None):
         """
 
         :param input_path: Path to input file or directory.
         :type input_path: str
         :param out_dir: Path to output directory.
         :type out_dir: str or None
-        :param params: Specific parameters for this run or event.
-        :type params: dict or None
+        :param info: Specific info for this run or event,
+            e.g. incident energy.
+        :type info: dict or None
         """
         self._check_input_path(input_path)
 
         self.input_path = input_path
+        self.parent = parent
         self.out_dir = out_dir
-        self.params = params
+
+        self.info = info or {}
 
         self.name = self._input_path2name(input_path)
-        self.param_values = self._parse_params(params)
+
+        if self.parent:
+            # Inherit things from the parent.
+            if self.parent.info:
+                _weak_update(self.info, self.parent.info)
+            if not self.out_dir:
+                self.out_dir = self.parent.out_subdir
+
+        if self.out_dir:
+            # Create out_dir in the filesystem and make a subdirectory
+            # name.
+            os.makedirs(self.out_dir, exist_ok=True)
+            self.out_subdir = os.path.join(self.out_dir, self.name)
+        else:
+            self.out_subdir = None
 
         self.hists = {}
-        # self.numbers = None
+
+        e_lims, tube_e_lims = self._get_e_lims(self.info)
+        self.hists['energy_vs_z'] = calc.EnergyVsZ(self, e_lims, tube_e_lims)
+        # self.hists['energy_vs_xy'] = calc.EnergyVsXY(self)
+
+        self.numbers = calc.Numbers(self)
 
     @abc.abstractmethod
     def _check_input_path(self, input_path):
@@ -59,16 +82,6 @@ class Piece(abc.ABC):
         """
 
     @abc.abstractmethod
-    def _parse_params(self, params):
-        """
-        Turn dictionary parameters into usable values.
-        :param params: See __init__.
-        :type params:
-        :return: Usable values.
-        :rtype:
-        """
-
-    @abc.abstractmethod
     def _input_path2name(self, input_path):
         """
         Turn an input path into a nicer name.
@@ -78,6 +91,27 @@ class Piece(abc.ABC):
         :return: A nicer name.
         :rtype: str
         """
+
+    @staticmethod
+    def _get_e_lims(info):
+        """
+        Get energy plot limits (full and tubes) from Piece info.
+
+        :param info: The Piece info.
+        :return: Energy plot limits (full and tubes).
+        """
+        if ('incident_energy' not in info) \
+                or (info['incident_energy'] == '350GeV'):
+            e_lims = _e_lims_350
+            tube_e_lims = _tube_e_lims_350
+        else:
+            e_lims = _e_lims_200
+            tube_e_lims = _tube_e_lims_200
+
+        return e_lims, tube_e_lims
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__ }: {self.name} @ {self.input_path}>'
 
 
 class Event(Piece):
@@ -98,56 +132,35 @@ class Event(Piece):
             run: The parent run that this event belongs to.
     """
 
-    def __init__(self, hits_path, out_dir=None, params=None,
-                 run=None):
+    def __init__(self, hits_path, parent=None, out_dir=None, info=None):
         """
 
         :param hits_path: Path to particle hits data from Geant4.
         :type hits_path: str
+        :param parent: The parent run that this event belongs to.
+        :type parent: Run or None
         :param out_dir: Path to output directory.
         :type out_dir: str or None
         :param out_text: Path to output text. Defaults to
             out_dir/analysis.txt.
         :type out_text: str or None
-        :param params: Specific parameters for this event.
-        :type params: dict or None
-        :param run: The parent run that this event belongs to.
-        :type run: Run or None
+        :param info: Specific parameters for this event.
+        :type info: dict or None
         """
-        super().__init__(hits_path, out_dir, params)
-
-        self.run = run
+        super().__init__(hits_path, parent, out_dir, info)
 
         self.hits = None
 
-        e_lims, tube_e_lims = self.param_values
-        self.hists['energy_vs_z'] = calc.EnergyVsZ(
-            e_lims, tube_e_lims, save_name=self.name, save_dir=self.out_dir
-        )
-        self.hists['energy_vs_xy'] = calc.EnergyVsXY(
-            save_name='_'.join((self.name, 'xy')), save_dir=self.out_dir
-        )
-        self.numbers = calc.Numbers('numbers')
+        # For tagging Numbers entries.
+        self.__tags = {'event': self.name}
+        if self.parent:
+            self.__tags['run'] = self.parent.name
 
         self.go()
 
     def _check_input_path(self, input_path):
         assert os.path.isfile(input_path), \
             "Event data path isn't a file."
-
-    def _parse_params(self, params):
-        # TODO: Take out this test.
-        if params is None:
-            params = {'incident_energy': '200GeV'}
-
-        if params['incident_energy'] == '200GeV':
-            e_lims = _e_lims_200
-            tube_e_lims = _tube_e_lims_200
-        else:
-            e_lims = _e_lims_350
-            tube_e_lims = _tube_e_lims_350
-
-        return e_lims, tube_e_lims
 
     def _input_path2name(self, input_path):
         return _file2name(input_path)
@@ -158,49 +171,28 @@ class Event(Piece):
 
         for histogram in self.hists.values():
             histogram.add_data(self.hits)
-            histogram.plot_single()
+            histogram.plot_single()  #### plot
 
-        tags = {'event': self.name}
-        if self.run is not None:
-            tags['run'] = self.run.name
-
-        self.numbers.add_data(self.hits, tags)
-
-    def __repr__(self):
-        return f'<Event: {self.name} @ {self.input_path}>'
+        self.numbers.add_data(self.hits, self.__tags)
 
 
 class Run(Piece):
     """A collection of events with a given setup."""
 
-    def __init__(self, events_path, out_dir=None, params=None):
+    def __init__(self, events_path, out_dir=None, info=None):
         """
 
         :param events_path: Path to directory containing data from
             multiple events.
         :type events_path: str
-        :param out_dir: Save things in here.
+        :param out_dir: Save things in here if this is given.
         :type out_dir: str or None
-        :param params: Specific parameters for this run.
-        :type params: dict or None
+        :param info: Specific parameters for this run.
+        :type info: dict or None
         """
-        super().__init__(events_path, out_dir, params)
+        parent = None
 
-        # TODO: Re-organize directory creation, and Run/MultiRun parent.
-        if self.out_dir is None:
-            self._out_subdir = None
-        else:
-            self._out_subdir = os.path.join(self.out_dir, self.name)
-            os.makedirs(self._out_subdir, exist_ok=True)
-
-        e_lims, tube_e_lims = self.param_values
-        self.hists['energy_vs_z'] = calc.EnergyVsZ(
-            e_lims, tube_e_lims, save_name=self.name, save_dir=self.out_dir
-        )
-        self.hists['energy_vs_xy'] = calc.EnergyVsXY(
-            save_name='_'.join((self.name, 'xy')), save_dir=self.out_dir
-        )
-        self.numbers = calc.Numbers(save_name=self.name, save_dir=self.out_dir)
+        super().__init__(events_path, parent, out_dir, info)
 
         self.go()
 
@@ -209,23 +201,21 @@ class Run(Piece):
         self._new_events()
 
         for hist in self.hists.values():
-            hist.plot_single(0)
+            hist.plot_means()  #### plot
 
         self.numbers.append_mean_and_dev(
             mean_tags={'run': self.name, 'event': 'mean'},
-            dev_tags={'run': self.name, 'event': 'std_dev'}
+            std_tags={'run': self.name, 'event': 'std_dev'}
         )
         self.numbers.save()
 
     def _new_events(self):
-        """Create new analyzed Events and update this Run."""
+        """
+        Create new analyzed Events and update this Run's analysis
+        results.
+        """
         for hits_path in self._event_paths():
-            event = Event(
-                hits_path,
-                out_dir=self._out_subdir,
-                params=self.params,
-                run=self
-            )
+            event = Event(hits_path, parent=self)
 
             for hist_name, hist in event.hists.items():
                 self.hists[hist_name].add_results(hist.get())
@@ -236,28 +226,61 @@ class Run(Piece):
         """Get the paths to the event data files."""
         root, dirs, files = next(os.walk(self.input_path))
         for filename in files:
-            yield os.path.join(root, filename)
+            if 'hits' in filename:
+                yield os.path.join(root, filename)
+
+    def _get_e_lims(self, info):
+        # Update info here so that the Run name can be used.
+        if 'incident_energy' not in info:
+            # Parse the folder name.
+            if '350gev' in self.name.lower():
+                self.info['incident_energy'] = '350GeV'
+            else:
+                self.info['incident_energy'] = '200GeV'
+
+        return super()._get_e_lims(info)
 
     def _check_input_path(self, input_path):
         assert os.path.isdir(input_path), \
             "Run directory path isn't actually a directory."
 
-    def _parse_params(self, params):
-        # TODO: Take out this test.
-        if params is None:
-            params = {'incident_energy': '200GeV'}
-
-        if params['incident_energy'] == '200GeV':
-            e_lims = _e_lims_200
-            tube_e_lims = _tube_e_lims_200
-        else:
-            e_lims = _e_lims_350
-            tube_e_lims = _tube_e_lims_350
-
-        return e_lims, tube_e_lims
-
     def _input_path2name(self, input_path):
         return _dir2name(input_path)
+
+
+def go(out_dir, *run_dirs):
+    """
+    Analyze a bunch of runs.
+
+    :param out_dir: Where to save all the results, if at all.
+    :type out_dir: str
+    :param run_dirs: Locations of the run data directories.
+    :type run_dirs: [str]
+    :return:
+    :rtype: None
+    """
+    if out_dir.lower() == 'none':
+        out_dir = None
+
+    for run_dir in run_dirs:
+        Run(run_dir, out_dir, info=_run_params(run_dir))
+
+
+def _run_params(run_dir):
+    """
+    Decide specific parameters for a run analysis based on its directory.
+    # TODO: Remove this; we already have it.
+
+    :param run_dir: The run directory.
+    :type run_dir: str
+    :return: info
+    :rtype: dict
+    """
+    if '350gev' in _dir2name(run_dir).lower():
+        # 350gev is in the dir name, ignoring case.
+        return {'incident_energy': '350GeV'}
+    else:
+        return {'incident_energy': '250Gev'}
 
 
 def _file2name(file):
@@ -289,3 +312,13 @@ def _dir2name(directory):
         tail, head = os.path.split(tail)
 
     return head
+
+
+def _weak_update(dict1, dict2):
+    """
+    Update dict1 with dict2 but with reversed priority. The existing
+    keys and values in dict1 are kept.
+    """
+    new_dict1 = dict2.copy()
+    new_dict1.update(dict1)
+    dict1.update(new_dict1)
