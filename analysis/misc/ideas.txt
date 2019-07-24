@@ -5,3 +5,5 @@ Move settings/parameters to their own file.
 doublePrint as a utility (again) with a set file.
 analyzeSmaller to analyzeOneSmaller
 Oreo sandwich analysis.
+
+TODO: Date output.

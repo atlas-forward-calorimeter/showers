@@ -20,9 +20,10 @@ _skiprows = 1
 class Piece(abc.ABC):
     """
     A "piece" of analysis.
+    # TODO: Document this.
 
     Attributes:
-        # TODO: Document this.
+        name: A nice name to go by.
         hists: Contains all of the Histograms.
     """
 
@@ -66,7 +67,7 @@ class Piece(abc.ABC):
 
         e_lims, tube_e_lims = self._get_e_lims(self.info)
         self.hists['energy_vs_z'] = calc.EnergyVsZ(self, e_lims, tube_e_lims)
-        # self.hists['energy_vs_xy'] = calc.EnergyVsXY(self)
+        self.hists['energy_vs_xy'] = calc.EnergyVsXY(self)
 
         self.numbers = calc.Numbers(self)
 
@@ -119,8 +120,6 @@ class Event(Piece):
     A single event.
 
         Attributes:
-            name: A nice name to go by.
-
             hits: Data obtained from the hits file path.
 
             energy_vs_z: Energy vs. z histogram object, from calc.
@@ -171,7 +170,7 @@ class Event(Piece):
 
         for histogram in self.hists.values():
             histogram.add_data(self.hits)
-            histogram.plot_single()  #### plot
+            histogram.plot_single()
 
         self.numbers.add_data(self.hits, self.__tags)
 
@@ -200,8 +199,8 @@ class Run(Piece):
         """Create new analyzed Events and analyze this Run."""
         self._new_events()
 
-        for hist in self.hists.values():
-            hist.plot_means()  #### plot
+        self.hists['energy_vs_z'].plot_means()
+        self.hists['energy_vs_z'].plot_multi()
 
         self.numbers.append_mean_and_dev(
             mean_tags={'run': self.name, 'event': 'mean'},
@@ -264,23 +263,6 @@ def go(out_dir, *run_dirs):
 
     for run_dir in run_dirs:
         Run(run_dir, out_dir, info=_run_params(run_dir))
-
-
-def _run_params(run_dir):
-    """
-    Decide specific parameters for a run analysis based on its directory.
-    # TODO: Remove this; we already have it.
-
-    :param run_dir: The run directory.
-    :type run_dir: str
-    :return: info
-    :rtype: dict
-    """
-    if '350gev' in _dir2name(run_dir).lower():
-        # 350gev is in the dir name, ignoring case.
-        return {'incident_energy': '350GeV'}
-    else:
-        return {'incident_energy': '250Gev'}
 
 
 def _file2name(file):

@@ -9,7 +9,7 @@ import os
 import numpy
 import pandas
 import seaborn
-from matplotlib import pyplot  #### plot  # TODO: Remove these plot __tags.
+from matplotlib import pyplot
 
 # Use seaborn's plotting styles.
 seaborn.set()
@@ -71,7 +71,6 @@ class Calc(abc.ABC):
         """
         if i is None:
             self._assert_single_entry()
-
             return self.resultss.loc[0]
 
         return self.resultss.loc[i]
@@ -93,12 +92,12 @@ class Calc(abc.ABC):
         good results).
 
         :param results: Results to add.
-        :type results: pandas.Series, dict, collections.OrderedDict
+        :type results: pandas.Series or dict or collections.OrderedDict
         :return:
         :rtype: None
         """
         self._check_results(results)
-        self.resultss = self.resultss.append(results, ignore_index=True)
+        self.resultss = _ordered_append(self.resultss, results)
 
     @abc.abstractmethod
     def _data2results(self, data):
@@ -116,13 +115,16 @@ class Calc(abc.ABC):
     def _assert_single_entry(self):
         """Make sure only one set of results has been added."""
         assert len(self.resultss) == 1, \
-            "This Calc container has more than one set of results."
+            "This Calc container does not have a single entry."
 
     def _assert_multiple_entries(self):
         """Make sure more than one set of results has been added."""
         assert len(self.resultss) > 1, \
             "This Calc container does not have more than one set of" \
             " results."
+
+    def __repr__(self):
+        return repr(self.resultss)
 
 
 class Numbers(Calc):
@@ -197,13 +199,6 @@ class Numbers(Calc):
 
         new_results.update(self.__split_z(data))
         new_results.update(self.__tubes(data))
-
-        # TODO: Remove these.
-
-        # new_results.update(self._piece.__tags)
-
-        # self.resultss.append(new_results, ignore_index=True)
-        # self._append(new_results)
 
         return new_results
 
@@ -358,22 +353,11 @@ class Histogram(Calc):
         """
 
     @abc.abstractmethod
-    def _new_fig_and_axes(self):
+    def _make_fig_and_axes(self):
         """
         Make a new labeled figure and axis/axes.
 
         :return: The figure and axis/axes.
-        :rtype: tuple
-        """
-
-    def plot_single_sums(self, sums):
-        """
-        Plot a lone set of histogram sums.
-        TODO: Remove.
-
-        :param sums: Histogram sums.
-        :type sums: numpy.ndarray
-        :return: New figure and axis/axes.
         :rtype: tuple
         """
 
@@ -418,17 +402,17 @@ class EnergyVsZ(Histogram):
         self.__bin_mids = _make_bin_midpoints(self.__bins)
 
     def plot_single(self, i=None, save=True):
-        fig, ax, ax_middle = self._new_fig_and_axes()
+        fig, ax, ax_middle = self._make_fig_and_axes()
         fig.suptitle(self.title)
 
         plate_kwargs = {'linewidth': _linewidth, 'color': 'blue'}
         tube_kwargs = {'linewidth': _linewidth, 'color': 'purple'}
         _split_plot(
             x=self.__bin_mids,
-            y=self._to_density(self.get(i)),
+            ys=(self._to_density(self.get(i)),),
             split_lims=self.__tube_z_lims,
-            ax1=ax_middle,
-            ax2=ax,
+            ax1_plot_func=ax_middle.plot,
+            ax2_plot_func=ax.plot,
             kwargs1=plate_kwargs,
             kwargs2=tube_kwargs
         )
@@ -437,22 +421,74 @@ class EnergyVsZ(Histogram):
             self.save_fig(fig, file_suffix=None)
 
     def plot_means(self):
-        fig, ax, ax_middle = self._new_fig_and_axes()
-        fig.suptitle(' '.join((self.title, '(Mean)')))
+        fig, ax, ax_middle = self._make_fig_and_axes()
+        fig.suptitle(' '.join((self.title, '(Average)')))
 
-        plate_kwargs = {'linewidth': _linewidth, 'color': 'blue'}
-        tube_kwargs = {'linewidth': _linewidth, 'color': 'purple'}
-        _split_plot(
+        means = self._to_density(numpy.mean(self.resultss, axis=0))
+        stds = self._to_density(numpy.std(self.resultss, axis=0))
+
+        tube_means_kwargs = {
+            'linewidth': _linewidth,
+            'color': 'blue',
+            'label': 'Tube Cals Average'
+        }
+        plate_means_kwargs = {
+            'linewidth': _linewidth,
+            'color': 'purple',
+            'label': 'Plate Cals Average'
+        }
+        tube_stds_kwargs = tube_means_kwargs.copy()
+        plate_stds_kwargs = plate_means_kwargs.copy()
+        tube_stds_kwargs.update({'alpha': 0.3, 'label': 'Standard Deviation'})
+        plate_stds_kwargs.update({'alpha': 0.3, 'label': 'Standard Deviation'})
+
+        _split_plot(  # Plot means.
             x=self.__bin_mids,
-            y=self._to_density(numpy.mean(self.resultss, axis=0)),
+            ys=(means,),
             split_lims=self.__tube_z_lims,
-            ax1=ax_middle,
-            ax2=ax,
-            kwargs1=plate_kwargs,
-            kwargs2=tube_kwargs
+            ax1_plot_func=ax_middle.plot,
+            ax2_plot_func=ax.plot,
+            kwargs1=tube_means_kwargs,
+            kwargs2=plate_means_kwargs
+        )
+        _split_plot(  # Plot standard deviations.
+            x=self.__bin_mids,
+            ys=(means + stds, means - stds),
+            split_lims=self.__tube_z_lims,
+            ax1_plot_func=ax_middle.fill_between,
+            ax2_plot_func=ax.fill_between,
+            kwargs1=tube_stds_kwargs,
+            kwargs2=plate_stds_kwargs
+        )
+
+        # Place a legend at the upper-right edge of the axes.
+        fig.legend(
+            loc='upper right',
+            bbox_to_anchor=(1, 1),
+            bbox_transform=ax.transAxes
         )
 
         self.save_fig(fig, file_suffix=None)
+
+    def plot_multi(self):
+        """Plot all of the events on one graph at once."""
+        fig, ax, ax_middle = self._make_fig_and_axes()
+        fig.suptitle(self.title)
+
+        kwargs = {'linewidth': _linewidth, 'alpha': 0.5}
+        _split_plot(
+            x=self.__bin_mids,
+            ys=tuple(
+                self._to_density(sums) for _, sums in self.resultss.iterrows()
+            ),
+            split_lims=self.__tube_z_lims,
+            ax1_plot_func=ax_middle.plot,
+            ax2_plot_func=ax.plot,
+            kwargs1=kwargs,
+            kwargs2=kwargs
+        )
+
+        self.save_fig(fig, file_suffix='multi')
 
     def _data2results(self, data):
         return pandas.Series(
@@ -466,19 +502,21 @@ class EnergyVsZ(Histogram):
         assert len(sums) == (len(self.__bins) - 1), \
             "Tried to add funny histogram sums."
 
-    def _new_fig_and_axes(self):
+    def _make_fig_and_axes(self):
         fig, ax = pyplot.subplots()
         ax_middle = ax.twinx()
 
         ax.set_xlabel(f'z ({self.length_units})')
         ax.set_ylabel(
-            'E Dep Density in Plate Cals'
+            'E Dep Density - Plate Cals'
             f' ({self.energy_units} / {self.length_units})'
         )
         ax_middle.set_ylabel(
-            'E Dep Density in Tube Cals'
+            'E Dep Density - Tube Cals'
             f' ({self.energy_units} / {self.length_units})'
         )
+
+        # TODO: Add text label of e dep.
 
         for axes, e_limits in zip(
                 (ax, ax_middle), (self.__e_lims, self.__tube_e_lims)
@@ -496,6 +534,7 @@ class EnergyVsXY(Histogram):
 
     def __init__(self, piece, title=None, xy_lims=None, z_lims=None):
         super().__init__(piece, title)
+        self.resultss = []  # Ust a list instead of a DataFrame.
 
         # Attributes with defaults.
         self.__xy_lims = xy_lims or _default_xy_lims
@@ -510,16 +549,33 @@ class EnergyVsXY(Histogram):
         )
 
     def plot_single(self, i=None, save=True):
-        fig, ax = self._new_fig_and_axes()
+        fig, ax = self._make_fig_and_axes()
         fig.suptitle(self.title)
 
         grid_x, grid_y = numpy.meshgrid(*self.__binss)
-        ax.pcolormesh(grid_x, grid_y, self.get(i))
+        ax.pcolormesh(grid_x, grid_y, self._to_density(self.get(i)))
 
         self.save_fig(fig, file_suffix=None)
 
     def plot_means(self):
         pass
+
+    def get(self, i=None):
+        """
+        Overrides the base to get from a list instead of a DataFrame.
+        """
+        if i is None:
+            self._assert_single_entry()
+            return self.resultss[0]
+
+        return self.resultss[i]
+
+    def add_results(self, sums):
+        """
+        Overrides the base to append to a list instead of a DataFrame.
+        """
+        self._check_results(sums)
+        self.resultss.append(sums)
 
     def _data2results(self, data):
         sliced = data[numpy.logical_and(
@@ -536,7 +592,7 @@ class EnergyVsXY(Histogram):
             tuple(len(bins) - 1 for bins in self.__binss)
         ))
 
-    def _new_fig_and_axes(self):
+    def _make_fig_and_axes(self):
         fig, ax = pyplot.subplots()
 
         ax.set_xlabel(f'x ({self.length_units})')
@@ -548,7 +604,15 @@ class EnergyVsXY(Histogram):
         return fig, ax
 
 
-def _split_plot(x, y, split_lims, ax1, ax2, kwargs1=None, kwargs2=None):
+def _split_plot(
+        x,
+        ys,
+        split_lims,
+        ax1_plot_func,
+        ax2_plot_func,
+        kwargs1=None,
+        kwargs2=None
+):
     """
     Split up data and plot it on two axes.
 
@@ -557,21 +621,23 @@ def _split_plot(x, y, split_lims, ax1, ax2, kwargs1=None, kwargs2=None):
 
     :param x: x values.
     :type x: 1d array
-    :param y: y values.
-    :type y: 1d array
+    :param ys: All the y values.
+    :type ys: 2d array
     :param split_lims: Split data based on x values within or outside of
         these limits.
     :type split_lims: (float, float)
-    :param ax1: Data inside split_lims (inclusive) goes on this.
-    :type ax1: axes
-    :param ax2: Data outside split_lims goes on this.
-    :type ax2: axes
+    :param ax1_plot_func: Data inside split_lims (inclusive) is plotted
+        by calling this.
+    :type ax1_plot_func: function
+    :param ax2_plot_func: Data outside split_lims is plotted by calling
+        this.
+    :type ax2_plot_func: function
     :param kwargs1: Keyword arguments passed to the ax1 plot.
     :type kwargs1: dict or None
     :param kwargs2: Keyword arguments passed to the ax2 plot.
     :type kwargs2: dict or None
-    :return:
-    :rtype:
+    :return: The two plot results.
+    :rtype: (handle, handle)
     """
     if kwargs1 is None:
         kwargs1 = {}
@@ -581,8 +647,33 @@ def _split_plot(x, y, split_lims, ax1, ax2, kwargs1=None, kwargs2=None):
     inside_indices = _range2indices(x, split_lims)
     outside_indices = numpy.logical_not(inside_indices)
 
-    ax1.plot(x[inside_indices], y[inside_indices], **kwargs1)
-    ax2.plot(x[outside_indices], y[outside_indices], **kwargs2)
+    plots1 = ax1_plot_func(
+        x[inside_indices],
+        *(y[inside_indices] for y in ys),
+        **kwargs1
+    )
+    plots2 = ax2_plot_func(
+        x[outside_indices],
+        *(y[outside_indices] for y in ys),
+        **kwargs2
+    )
+
+    return plots1, plots2
+
+
+def _range2indices(array, range_lims):
+    """
+    Find the values of an array that are inclusively within range_lims.
+
+    :param array: Array of values that are compared to range_lims.
+    :type array: numpy.ndarray
+    :param range_lims: (lower limit, upper limit)
+    :type range_lims: (float, float)
+    :return: Boolean array locating the indices of the values within the
+        range.
+    :rtype: numpy.ndarray
+    """
+    return numpy.logical_and(range_lims[0] <= array, array <= range_lims[1])
 
 
 @functools.lru_cache()
@@ -617,37 +708,29 @@ def _make_bin_midpoints(bins):
     return (bins[:-1] + bins[1:]) / 2
 
 
-def _range2indices(array, range_lims):
+def _ordered_append(dataframe, other):
     """
-    Find the values of an array that are inclusively within range_lims.
+    Append `other` to `dataframe` while keeping the order of the columns
+    in both.
 
-    :param array: Array of values that are compared to range_lims.
-    :type array: numpy.ndarray
-    :param range_lims: (lower limit, upper limit)
-    :type range_lims: (float, float)
-    :return: Boolean array locating the indices of the values within the
-        range.
-    :rtype: numpy.ndarray
+    The `append` method that comes with pandas Dataframes alphabetizes
+    the order of the columns, which may not always be desired. This
+    function provides an alternative.
+
+    :param dataframe: The DataFrame to append to.
+    :type dataframe: pandas.DataFrame
+    :param other: The data to append.
+    :type other: pandas.DataFrame or pandas.Series/dict-like object,
+        or list of these
+    :return: New DataFrame with appended data.
+    :rtype: pandas.DataFrame
     """
-    return numpy.logical_and(range_lims[0] <= array, array <= range_lims[1])
+    # The new column order. New columns from `other` are inserted in
+    # front of the original `dataframe` columns.
+    columns = [
+                  col for col in other.keys() if col not in dataframe.keys()
+              ] + list(dataframe.keys())
 
-
-def _default_save_params(save_name, save_dir):
-    """
-    Require save_name if save_dir is given.
-    TODO: Remove this.
-
-    :param save_name: Name of file to save.
-    :type save_name: str or None
-    :param save_dir: Directory to save to.
-    :type save_dir: str or None
-    :return: save_name, save_dir
-    :rtype: (str, str)
-    """
-    if save_dir is not None:
-        assert save_name is not None, (
-            "Please give a save filename if you would like to"
-            " save figures."
-        )
-
-    return save_name, save_dir
+    # pandas' append alphabetizes the columns here. Indexing the result
+    # with `columns` sets our own column order.
+    return dataframe.append(other, ignore_index=True)[columns]
