@@ -20,11 +20,13 @@ _skiprows = 1
 class Piece(abc.ABC):
     """
     A "piece" of analysis.
-    # TODO: Document this.
 
     Attributes:
         name: A nice name to go by.
         hists: Contains all of the Histograms.
+
+    TODO: Document this.
+    TODO: Parse paths and make titles.
     """
 
     def __init__(self, input_path, parent=None, out_dir=None, info=None):
@@ -71,6 +73,9 @@ class Piece(abc.ABC):
 
         self.numbers = calc.Numbers(self)
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__ }: {self.name} @ {self.input_path}>'
+
     @abc.abstractmethod
     def _check_input_path(self, input_path):
         """
@@ -111,8 +116,11 @@ class Piece(abc.ABC):
 
         return e_lims, tube_e_lims
 
-    def __repr__(self):
-        return f'<{self.__class__.__name__ }: {self.name} @ {self.input_path}>'
+    @staticmethod
+    def _energy_label(e_dep, std=None):
+        if std:
+            return f"{int(round(e_dep))}$\\pm${int(round(std))} MeV"
+        return f"{int(round(e_dep))} MeV"
 
 
 class Event(Piece):
@@ -170,9 +178,11 @@ class Event(Piece):
 
         for histogram in self.hists.values():
             histogram.add_data(self.hits)
-            histogram.plot_single()
-
         self.numbers.add_data(self.hits, self.__tags)
+
+        self.hists['energy_vs_z'].plot_single(
+            energy_label=self._energy_label(self.numbers.get()['middle_e_dep'])
+        )
 
 
 class Run(Piece):
@@ -199,14 +209,17 @@ class Run(Piece):
         """Create new analyzed Events and analyze this Run."""
         self._new_events()
 
-        self.hists['energy_vs_z'].plot_means()
-        self.hists['energy_vs_z'].plot_multi()
-
-        self.numbers.append_mean_and_dev(
+        means, stds = self.numbers.append_mean_and_dev(
             mean_tags={'run': self.name, 'event': 'mean'},
             std_tags={'run': self.name, 'event': 'std_dev'}
         )
         self.numbers.save()
+
+        energy_label = self._energy_label(
+            means['middle_e_dep'], stds['middle_e_dep']
+        )
+        self.hists['energy_vs_z'].plot_means(energy_label=energy_label)
+        self.hists['energy_vs_z'].plot_multi(energy_label=energy_label)
 
     def _new_events(self):
         """

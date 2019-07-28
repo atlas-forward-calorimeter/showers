@@ -2,7 +2,9 @@
 
 import abc
 import collections
+import datetime
 import functools
+import itertools
 import math
 import os
 
@@ -59,6 +61,9 @@ class Calc(abc.ABC):
             self.save_dir = None
             self.save_name = None
 
+    def __repr__(self):
+        return repr(self.resultss)
+
     def get(self, i=None):
         """
         Get the ith set of results, or if i isn't given, make sure
@@ -99,6 +104,32 @@ class Calc(abc.ABC):
         self._check_results(results)
         self.resultss = _ordered_append(self.resultss, results)
 
+    def save(self):
+        """
+        Save results to a csv file if save_dir is set.
+
+        :return: Path to saved results file.
+        :rtype: str
+        """
+        if not self.save_dir:
+            return None
+
+        filename = '.'.join((self.save_name, _data_format))
+        filepath = os.path.join(self.save_dir, filename)
+
+        header = (  # Inserted at the top of the output file.
+            'FCal and SCal Analysis output.'
+            f' {datetime.datetime.now().ctime()}'
+        )
+        output = '\n'.join((
+            header,
+            self.resultss.to_string(index=False)
+        ))
+        with open(filepath, 'w') as file:
+            file.write(output)
+
+        return filepath
+
     @abc.abstractmethod
     def _data2results(self, data):
         """
@@ -122,9 +153,6 @@ class Calc(abc.ABC):
         assert len(self.resultss) > 1, \
             "This Calc container does not have more than one set of" \
             " results."
-
-    def __repr__(self):
-        return repr(self.resultss)
 
 
 class Numbers(Calc):
@@ -165,21 +193,7 @@ class Numbers(Calc):
         self.add_results(means)
         self.add_results(stds)
 
-    def save(self):
-        """
-        Save results to a csv file if save_dir is set.
-
-        :return: Path to saved results file.
-        :rtype: str
-        """
-        if not self.save_dir:
-            return None
-
-        filename = '.'.join((self.save_name, _data_format))
-        filepath = os.path.join(self.save_dir, filename)
-        self.resultss.to_csv(filepath, index=False)
-
-        return filepath
+        return means, stds
 
     def _data2results(self, data, tags=None):
         """
@@ -256,14 +270,14 @@ class Histogram(Calc):
     """
     Base histogram.
 
-    TODO: Close figures.
-
         Attributes:
             bin_density: E.g. bins per mm.
 
             dpi: Dots per inch for images.
 
             title: The plot title.
+
+    TODO: Add the option to close all the plot figures created.
     """
 
     def __init__(
@@ -374,6 +388,8 @@ class EnergyVsZ(Histogram):
             z_lims: Overall z limits.
 
             tube_z_lims: Tube z limits.
+
+            middle_z_lims: Tube middle section z limits.
     """
 
     _default_title = 'Energy vs. z.'
@@ -385,7 +401,8 @@ class EnergyVsZ(Histogram):
             tube_e_lims,
             title=None,
             z_lims=None,
-            tube_z_lims=None
+            tube_z_lims=None,
+            middle_z_lims=None
     ):
         super().__init__(piece, title)
 
@@ -395,34 +412,47 @@ class EnergyVsZ(Histogram):
         # Attributes with defaults.
         self.__z_lims = z_lims or _default_z_lims
         self.__tube_z_lims = tube_z_lims or _default_tube_z_lims
+        self.__middle_z_lims = middle_z_lims or _default_middle_z_lims
 
         self.__bins = _make_bins(
             self.__z_lims[0], self.__z_lims[1], self.bin_density
         )
         self.__bin_mids = _make_bin_midpoints(self.__bins)
 
-    def plot_single(self, i=None, save=True):
+    def plot_single(self, i=None, save=True, energy_label=None):
+        """
+        Plot a single event.
+
+        :param energy_label: Energy deposit in middle tube sections,
+            displayed in a text label on the plot.
+        """
         fig, ax, ax_middle = self._make_fig_and_axes()
         fig.suptitle(self.title)
+        self.__label_middle(ax, energy_label)
 
-        plate_kwargs = {'linewidth': _linewidth, 'color': 'blue'}
-        tube_kwargs = {'linewidth': _linewidth, 'color': 'purple'}
-        _split_plot(
+        tube_kwargs = {
+            'linewidth': _linewidth, 'color': 'purple', 'label': 'Tube Cals'
+        }
+        plate_kwargs = {
+            'linewidth': _linewidth, 'color': 'blue', 'label': 'Plate Cals'
+        }
+        self.__split_plot(
             x=self.__bin_mids,
             ys=(self._to_density(self.get(i)),),
-            split_lims=self.__tube_z_lims,
-            ax1_plot_func=ax_middle.plot,
-            ax2_plot_func=ax.plot,
+            plot_fn=ax_middle.plot,
+            main_ax=ax,
             kwargs1=plate_kwargs,
             kwargs2=tube_kwargs
         )
 
+        self.__add_legend(fig, ax, ax_middle)
         if save:
             self.save_fig(fig, file_suffix=None)
 
-    def plot_means(self):
+    def plot_means(self, energy_label=None):
         fig, ax, ax_middle = self._make_fig_and_axes()
         fig.suptitle(' '.join((self.title, '(Average)')))
+        self.__label_middle(ax_middle, energy_label)
 
         means = self._to_density(numpy.mean(self.resultss, axis=0))
         stds = self._to_density(numpy.std(self.resultss, axis=0))
@@ -442,51 +472,46 @@ class EnergyVsZ(Histogram):
         tube_stds_kwargs.update({'alpha': 0.3, 'label': 'Standard Deviation'})
         plate_stds_kwargs.update({'alpha': 0.3, 'label': 'Standard Deviation'})
 
-        _split_plot(  # Plot means.
+        self.__split_plot(  # Plot means.
             x=self.__bin_mids,
             ys=(means,),
-            split_lims=self.__tube_z_lims,
-            ax1_plot_func=ax_middle.plot,
-            ax2_plot_func=ax.plot,
+            plot_fn=ax_middle.plot,
+            main_ax=ax,
             kwargs1=tube_means_kwargs,
             kwargs2=plate_means_kwargs
         )
-        _split_plot(  # Plot standard deviations.
+        self.__split_plot(  # Plot standard deviations.
             x=self.__bin_mids,
             ys=(means + stds, means - stds),
-            split_lims=self.__tube_z_lims,
-            ax1_plot_func=ax_middle.fill_between,
-            ax2_plot_func=ax.fill_between,
+            plot_fn=ax_middle.fill_between,
+            main_ax=ax,
             kwargs1=tube_stds_kwargs,
             kwargs2=plate_stds_kwargs
         )
 
-        # Place a legend at the upper-right edge of the axes.
-        fig.legend(
-            loc='upper right',
-            bbox_to_anchor=(1, 1),
-            bbox_transform=ax.transAxes
-        )
-
+        self.__add_legend(fig, ax, ax_middle)
         self.save_fig(fig, file_suffix=None)
 
-    def plot_multi(self):
+    def plot_multi(self, energy_label=None):
         """Plot all of the events on one graph at once."""
         fig, ax, ax_middle = self._make_fig_and_axes()
         fig.suptitle(self.title)
+        self.__label_middle(ax_middle, energy_label)
 
         kwargs = {'linewidth': _linewidth, 'alpha': 0.5}
-        _split_plot(
-            x=self.__bin_mids,
-            ys=tuple(
-                self._to_density(sums) for _, sums in self.resultss.iterrows()
-            ),
-            split_lims=self.__tube_z_lims,
-            ax1_plot_func=ax_middle.plot,
-            ax2_plot_func=ax.plot,
-            kwargs1=kwargs,
-            kwargs2=kwargs
-        )
+        colors = itertools.cycle((
+            'red', 'orange', 'yellow', 'pink', 'purple', 'brown', 'black'
+        ))
+        for _, sums in self.resultss.iterrows():
+            kwargs['color'] = next(colors)
+            self.__split_plot(
+                x=self.__bin_mids,
+                ys=(self._to_density(sums),),
+                plot_fn=ax_middle.plot,
+                main_ax=ax,
+                kwargs1=kwargs,
+                kwargs2=kwargs
+            )
 
         self.save_fig(fig, file_suffix='multi')
 
@@ -516,7 +541,13 @@ class EnergyVsZ(Histogram):
             f' ({self.energy_units} / {self.length_units})'
         )
 
-        # TODO: Add text label of e dep.
+        # Indicate the middle tube sections with vertical bars.
+        for lim in self.__middle_z_lims:
+            ax_middle.axvline(lim, linestyle='--', linewidth=1, color='gray', zorder=0)
+
+        # for axes in (ax, ax_middle):
+        #     axes.spines['right'].set_visible(False)
+        #     axes.spines['top'].set_visible(False)
 
         for axes, e_limits in zip(
                 (ax, ax_middle), (self.__e_lims, self.__tube_e_lims)
@@ -525,6 +556,98 @@ class EnergyVsZ(Histogram):
             axes.set_ylim(e_limits)
 
         return fig, ax, ax_middle
+
+    def __split_plot(
+            self, x, ys, plot_fn, main_ax, kwargs1=None, kwargs2=None
+    ):
+        """
+        Split up data and plot it on two axes.
+
+        The data with x values inside split_lims (inclusive) is plotted
+        using `plot_fn` normally, and the rest is scaled to `main_ax`.
+
+        :param x: x values.
+        :type x: 1d array
+        :param ys: All the y values.
+        :type ys: 2d array
+        :param plot_fn: Function that plots data to the middle axes.
+            The middle axes are displayed on top, so all plotting uses
+            this function to avoid overlapping axes.
+        :type plot_fn: function
+        :param main_ax: The main axes, which lie underneath the middle
+            axes.
+        :type ax2_plot_func: matplotlib.pyplot.axes
+        :param kwargs1: Keyword arguments passed to the ax1 plot.
+        :type kwargs1: dict or None
+        :param kwargs2: Keyword arguments passed to the ax2 plot.
+        :type kwargs2: dict or None
+        :return: The two plot results.
+        :rtype: (handle, handle)
+        """
+        kwargs1 = kwargs1 or None
+        kwargs2 = kwargs2 or None
+
+        inside_indices = _range2indices(x, self.__tube_z_lims)
+        outside_indices = numpy.logical_not(inside_indices)
+
+        plots = plot_fn(
+            x[outside_indices],
+            *(y[outside_indices] for y in ys),
+            transform=main_ax.transData,
+            **kwargs2
+        )
+        plots_middle = plot_fn(
+            x[inside_indices],
+            *(y[inside_indices] for y in ys),
+            **kwargs1
+        )
+        return plots, plots_middle
+
+
+    def __label_middle(self, ax, energy_label):
+        """Label the energy deposit in the middle tube sections."""
+        if energy_label:
+            # ax.text(x=0, y=50, s=energy_label, horizontalalignment='center')
+            ax.annotate(
+                energy_label,
+                bbox={
+                    'boxstyle': 'round4',
+                    'facecolor':
+                        pyplot.style.library['seaborn']['axes.facecolor'],
+                    'edgecolor': 'silver',
+                    'alpha': 0.7
+                },
+                xy=(0, 0),
+                xycoords='data',
+                xytext=(0, 25),
+                textcoords='offset points',
+                horizontalalignment='center',
+                verticalalignment='center'
+            )
+
+    @staticmethod
+    def __add_legend(fig, ax, ax_middle):
+        """Place a legend at the upper-right corner of the axes"""
+        # Combine legend handles and labels from both axes.
+        handles, labels = (val1 + val2 for val1, val2 in zip(
+            ax.get_legend_handles_labels(),
+            ax_middle.get_legend_handles_labels()
+        ))
+
+        legend = ax_middle.legend(
+            handles,
+            labels,
+            loc='upper right',
+            ncol=2,
+            fontsize='small',
+
+            # Place legend at the corner of the axes rather.
+            # `figure.legend` places the legend at the corner of the
+            # figure instead.
+            # bbox_to_anchor=(1, 1),
+            # bbox_transform=ax.transAxes
+        )
+        legend.set_zorder(1)
 
 
 class EnergyVsXY(Histogram):
@@ -555,7 +678,7 @@ class EnergyVsXY(Histogram):
         grid_x, grid_y = numpy.meshgrid(*self.__binss)
         ax.pcolormesh(grid_x, grid_y, self._to_density(self.get(i)))
 
-        self.save_fig(fig, file_suffix=None)
+        self.save_fig(fig, file_suffix='xy')
 
     def plot_means(self):
         pass
