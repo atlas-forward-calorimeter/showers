@@ -243,6 +243,7 @@ class Numbers(Calc):
     def __tubes(data):
         """TODO: Document and organize this."""
         offset = 7.5 / 4
+		# TODO: Change default to self.
         data = data[numpy.logical_and(_default_middle_z_lims[0] < data.z, data.z < _default_middle_z_lims[1])]
 
         right = data.z > 0

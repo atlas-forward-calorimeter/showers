@@ -3,10 +3,12 @@
 TODO: Take out randomness in incident beta?
 TODO: Record that the event with the proton was run 8-4 event 5.
 TODO: Consider switching to a 16x9 aspect ratio.
+TODO: Remove titles completely.
 """
 
 import abc
 import os
+import warnings
 
 import pandas
 
@@ -272,6 +274,9 @@ class Run(Piece):
         self.hists['energy_vs_z'].plot_means(energy_label=energy_label)
         self.hists['energy_vs_z'].plot_multi(energy_label=energy_label)
 
+        # Print out that we're done.
+        print(f'Run {self.name} is finished!')
+
     def _new_events(self):
         """
         Create new analyzed Events and update this Run's analysis
@@ -349,13 +354,19 @@ def go(out_dir, *run_dirs):
     if len(run_dirs) == 1:
         return [Run(run_dirs[0], out_dir)]
 
-    runs = [
-        Run(
-            events_path=run_dir,
-            out_dir=os.path.join(out_dir, _dir2name(run_dir))
-        )
-        for run_dir in run_dirs
-    ]
+    runs = []
+    for run_dir in run_dirs:
+        try:
+            runs.append(
+                Run(
+                    events_path=run_dir,
+                    out_dir=os.path.join(out_dir, _dir2name(run_dir))
+                )
+            )
+        except:
+            warnings.warn(f"Couldn't analyze the directory ' {run_dir}.")
+    assert runs, "Couldn't successfully analyze any runs!"
+
     calc.save_dataframe(
         dataframe=pandas.concat(
             (run.numbers.resultss for run in runs),
