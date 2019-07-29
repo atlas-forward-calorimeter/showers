@@ -23,7 +23,10 @@ _default_energy_units = 'MeV'
 
 _default_z_lims = (-50, 80)
 _default_tube_z_lims = (-35 / 2, 35 / 2)
-_default_middle_z_lims = (-8 / 2, 8 / 2)
+
+# Convert the _default_middle_z_lims to integers so that the plot
+# tick labels are displayed without decimals.
+_default_middle_z_lims = tuple(int(lim) for lim in (-8 / 2, 8 / 2))
 
 _default_xy_lims = 2 * ((-20 / 2, 20 / 2),)
 _default_xy_hist_z_lims = _default_middle_z_lims
@@ -116,19 +119,37 @@ class Calc(abc.ABC):
 
         filename = '.'.join((self.save_name, _data_format))
         filepath = os.path.join(self.save_dir, filename)
+        excel_filename = self.save_name + '-excel.xlsx'
+        excel_filepath = os.path.join(self.save_dir, excel_filename)
 
         header = (  # Inserted at the top of the output file.
-            'FCal and SCal Analysis output.'
+            'FCal and SCal analysis output.'
             f' {datetime.datetime.now().ctime()}'
         )
         output = '\n'.join((
             header,
-            self.resultss.to_string(index=False)
+            self.resultss.to_string(index=False),
+            ''
         ))
         with open(filepath, 'w') as file:
             file.write(output)
 
+        # Save to excel format since Office 365 prohibits the use of
+        # space delimited csv's.
+        self.resultss.to_excel(excel_filepath, index=False)
+
         return filepath
+
+    def _assert_single_entry(self):
+        """Make sure only one set of results has been added."""
+        assert len(self.resultss) == 1, \
+            "This Calc container does not have a single entry."
+
+    def _assert_multiple_entries(self):
+        """Make sure more than one set of results has been added."""
+        assert len(self.resultss) > 1, \
+            "This Calc container does not have more than one set of" \
+            " results."
 
     @abc.abstractmethod
     def _data2results(self, data):
@@ -142,17 +163,6 @@ class Calc(abc.ABC):
     @abc.abstractmethod
     def _check_results(self, results):
         """Make sure some calculated results are good to keep."""
-
-    def _assert_single_entry(self):
-        """Make sure only one set of results has been added."""
-        assert len(self.resultss) == 1, \
-            "This Calc container does not have a single entry."
-
-    def _assert_multiple_entries(self):
-        """Make sure more than one set of results has been added."""
-        assert len(self.resultss) > 1, \
-            "This Calc container does not have more than one set of" \
-            " results."
 
 
 class Numbers(Calc):
@@ -186,9 +196,9 @@ class Numbers(Calc):
         stds = self.resultss.std()
 
         if mean_tags:
-            means = means.append(pandas.Series(mean_tags))
+            means = pandas.Series(mean_tags).combine_first(means)
         if std_tags:
-            stds = stds.append(pandas.Series(std_tags))
+            stds = pandas.Series(std_tags).combine_first(stds)
 
         self.add_results(means)
         self.add_results(stds)
@@ -292,7 +302,7 @@ class Histogram(Calc):
         super().__init__(piece)
 
         # Attributes with defaults.
-        self.title = self._default_title or title
+        self.title = title or self._default_title
         self.bin_density = bin_density or _default_bin_density
         self.dpi = dpi or _default_dpi
         self.energy_units = energy_units or _default_energy_units
@@ -428,7 +438,7 @@ class EnergyVsZ(Histogram):
         """
         fig, ax, ax_middle = self._make_fig_and_axes()
         fig.suptitle(self.title)
-        self.__label_middle(ax, energy_label)
+        self.__label_middle(ax_middle, energy_label)
 
         tube_kwargs = {
             'linewidth': _linewidth, 'color': 'purple', 'label': 'Tube Cals'
@@ -441,8 +451,8 @@ class EnergyVsZ(Histogram):
             ys=(self._to_density(self.get(i)),),
             plot_fn=ax_middle.plot,
             main_ax=ax,
-            kwargs1=plate_kwargs,
-            kwargs2=tube_kwargs
+            kwargs1=tube_kwargs,
+            kwargs2=plate_kwargs
         )
 
         self.__add_legend(fig, ax, ax_middle)
@@ -451,7 +461,7 @@ class EnergyVsZ(Histogram):
 
     def plot_means(self, energy_label=None):
         fig, ax, ax_middle = self._make_fig_and_axes()
-        fig.suptitle(' '.join((self.title, '(Average)')))
+        fig.suptitle(self.title + ' Averaged.')
         self.__label_middle(ax_middle, energy_label)
 
         means = self._to_density(numpy.mean(self.resultss, axis=0))
@@ -459,12 +469,12 @@ class EnergyVsZ(Histogram):
 
         tube_means_kwargs = {
             'linewidth': _linewidth,
-            'color': 'blue',
+            'color': 'purple',
             'label': 'Tube Cals Average'
         }
         plate_means_kwargs = {
             'linewidth': _linewidth,
-            'color': 'purple',
+            'color': 'blue',
             'label': 'Plate Cals Average'
         }
         tube_stds_kwargs = tube_means_kwargs.copy()
@@ -495,7 +505,8 @@ class EnergyVsZ(Histogram):
     def plot_multi(self, energy_label=None):
         """Plot all of the events on one graph at once."""
         fig, ax, ax_middle = self._make_fig_and_axes()
-        fig.suptitle(self.title)
+        num_events = len(self.resultss)
+        fig.suptitle(self.title + f' {num_events} events.')
         self.__label_middle(ax_middle, energy_label)
 
         kwargs = {'linewidth': _linewidth, 'alpha': 0.5}
@@ -513,7 +524,7 @@ class EnergyVsZ(Histogram):
                 kwargs2=kwargs
             )
 
-        self.save_fig(fig, file_suffix='multi')
+        self.save_fig(fig, file_suffix=f'{num_events}events')
 
     def _data2results(self, data):
         return pandas.Series(
@@ -541,9 +552,14 @@ class EnergyVsZ(Histogram):
             f' ({self.energy_units} / {self.length_units})'
         )
 
-        # Indicate the middle tube sections with vertical bars.
+        # Indicate the middle tube sections with vertical bars and axis
+        # ticks.
         for lim in self.__middle_z_lims:
-            ax_middle.axvline(lim, linestyle='--', linewidth=1, color='gray', zorder=0)
+            ax_middle.axvline(
+                lim, linestyle='--', linewidth=1, color='gray', zorder=0
+            )
+        ax_middle.set_xticks(self.__middle_z_lims, minor=True)
+        ax_middle.set_xticklabels(self.__middle_z_lims, minor=True)
 
         # for axes in (ax, ax_middle):
         #     axes.spines['right'].set_visible(False)
@@ -577,9 +593,9 @@ class EnergyVsZ(Histogram):
         :param main_ax: The main axes, which lie underneath the middle
             axes.
         :type ax2_plot_func: matplotlib.pyplot.axes
-        :param kwargs1: Keyword arguments passed to the ax1 plot.
+        :param kwargs1: Keyword arguments passed to the middle plot.
         :type kwargs1: dict or None
-        :param kwargs2: Keyword arguments passed to the ax2 plot.
+        :param kwargs2: Keyword arguments passed to the full plot.
         :type kwargs2: dict or None
         :return: The two plot results.
         :rtype: (handle, handle)
@@ -607,7 +623,6 @@ class EnergyVsZ(Histogram):
     def __label_middle(self, ax, energy_label):
         """Label the energy deposit in the middle tube sections."""
         if energy_label:
-            # ax.text(x=0, y=50, s=energy_label, horizontalalignment='center')
             ax.annotate(
                 energy_label,
                 bbox={

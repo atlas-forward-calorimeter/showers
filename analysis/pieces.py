@@ -1,7 +1,11 @@
-"""Analyzing data in "pieces." Events, Runs, etc."""
+"""Analyzing data in "pieces." Events, Runs, etc.
+
+TODO: Take out randomness in incident beta?
+TODO: Record that the event with the proton was run 8-4 event 5.
+TODO: Consider switching to a 16x9 aspect ratio.
+"""
 
 import abc
-import collections
 import os
 
 import pandas
@@ -65,16 +69,69 @@ class Piece(abc.ABC):
         else:
             self.out_subdir = None
 
+        self._update_info()
+
         self.hists = {}
 
-        e_lims, tube_e_lims = self._get_e_lims(self.info)
-        self.hists['energy_vs_z'] = calc.EnergyVsZ(self, e_lims, tube_e_lims)
-        self.hists['energy_vs_xy'] = calc.EnergyVsXY(self)
+        e_lims, tube_e_lims = self.__get_e_lims()
+        z_title, xy_title = self._get_titles()
+        self.hists['energy_vs_z'] = calc.EnergyVsZ(
+            self, e_lims, tube_e_lims, z_title
+        )
+        self.hists['energy_vs_xy'] = calc.EnergyVsXY(self, xy_title)
 
         self.numbers = calc.Numbers(self)
 
     def __repr__(self):
         return f'<{self.__class__.__name__ }: {self.name} @ {self.input_path}>'
+
+    def _get_titles(self):
+        """Get histogram titles from the Piece info. Returns the same
+        title for both z and xy histograms.
+        """
+        title = 'E dep density.'
+
+        incident_energy = self.info.get('incident_energy')
+        if incident_energy == '350gev':
+            title += ' 350 GeV $e^-.$'
+        elif incident_energy == '200gev':
+            title += ' 200 GeV $e^-.$'
+
+        plates = self.info.get('plates')
+        if plates:
+            title += f' {plates[0]} by {plates[1]}.'
+
+        if self.info.get('no_cryo'):
+            title += ' No cryo.'
+
+        return title, title
+
+    def _update_info(self):
+        """Update this Piece's info (with access to all the defaults
+        that are set in __init__). Implemented in the concrete Pieces.
+        """
+
+    def __get_e_lims(self):
+        """
+        Get energy plot limits (full and tubes) from Piece info.
+
+        :param info: The Piece info.
+        :return: Energy plot limits (full and tubes).
+        """
+        if ('incident_energy' not in self.info) \
+                or (self.info['incident_energy'] == '350gev'):
+            e_lims = _e_lims_350
+            tube_e_lims = _tube_e_lims_350
+        else:
+            e_lims = _e_lims_200
+            tube_e_lims = _tube_e_lims_200
+        return e_lims, tube_e_lims
+
+    @staticmethod
+    def _energy_label(e_dep, std=None):
+        if std:
+            return f"{int(round(e_dep))}$\\pm${int(round(std))} MeV"
+        return f"{int(round(e_dep))} MeV"
 
     @abc.abstractmethod
     def _check_input_path(self, input_path):
@@ -97,30 +154,6 @@ class Piece(abc.ABC):
         :return: A nicer name.
         :rtype: str
         """
-
-    @staticmethod
-    def _get_e_lims(info):
-        """
-        Get energy plot limits (full and tubes) from Piece info.
-
-        :param info: The Piece info.
-        :return: Energy plot limits (full and tubes).
-        """
-        if ('incident_energy' not in info) \
-                or (info['incident_energy'] == '350GeV'):
-            e_lims = _e_lims_350
-            tube_e_lims = _tube_e_lims_350
-        else:
-            e_lims = _e_lims_200
-            tube_e_lims = _tube_e_lims_200
-
-        return e_lims, tube_e_lims
-
-    @staticmethod
-    def _energy_label(e_dep, std=None):
-        if std:
-            return f"{int(round(e_dep))}$\\pm${int(round(std))} MeV"
-        return f"{int(round(e_dep))} MeV"
 
 
 class Event(Piece):
@@ -159,18 +192,11 @@ class Event(Piece):
         self.hits = None
 
         # For tagging Numbers entries.
-        self.__tags = {'event': self.name}
+        self.__tags = {'event': self.info['event']}
         if self.parent:
             self.__tags['run'] = self.parent.name
 
         self.go()
-
-    def _check_input_path(self, input_path):
-        assert os.path.isfile(input_path), \
-            "Event data path isn't a file."
-
-    def _input_path2name(self, input_path):
-        return _file2name(input_path)
 
     def go(self):
         """Read in data, make plots and do calculations."""
@@ -183,6 +209,24 @@ class Event(Piece):
         self.hists['energy_vs_z'].plot_single(
             energy_label=self._energy_label(self.numbers.get()['middle_e_dep'])
         )
+
+    def _update_info(self):
+        event_number = int(self.name.split('-')[-1])
+        self.info['event'] = event_number
+
+    def _get_titles(self):
+        z_title, xy_title = (
+            title + f" Event {self.info['event']}."
+            for title in super()._get_titles()
+        )
+        return z_title, xy_title
+
+    def _check_input_path(self, input_path):
+        assert os.path.isfile(input_path), \
+            "Event data path isn't a file."
+
+    def _input_path2name(self, input_path):
+        return _file2name(input_path)
 
 
 class Run(Piece):
@@ -200,8 +244,11 @@ class Run(Piece):
         :type info: dict or None
         """
         parent = None
-
         super().__init__(events_path, parent, out_dir, info)
+
+        # if 'incident_energy' not in self.info:
+        #     self.info['incident_energy'] = '350GeV'
+        # TODO: Remove.
 
         self.go()
 
@@ -241,16 +288,37 @@ class Run(Piece):
             if 'hits' in filename:
                 yield os.path.join(root, filename)
 
-    def _get_e_lims(self, info):
-        # Update info here so that the Run name can be used.
-        if 'incident_energy' not in info:
-            # Parse the folder name.
-            if '350gev' in self.name.lower():
-                self.info['incident_energy'] = '350GeV'
-            else:
-                self.info['incident_energy'] = '200GeV'
+    # def __get_e_lims(self):
+    #     # Update info here so that the Run name can be used.
+    #     # TODO: Remove.
+    #     if 'incident_energy' not in self.info:
+    #         # Parse the folder name.
+    #         if '350gev' in self.name.lower():
+    #             self.info['incident_energy'] = '350gev'
+    #         else:
+    #             self.info['incident_energy'] = '200gev'
+    #     return super().__get_e_lims()
 
-        return super()._get_e_lims(info)
+    def _update_info(self):
+        lowercase_name = self.name.lower()
+        if 'incident_energy' not in self.info:
+            # Parse the folder name.
+            if '350gev' in lowercase_name:
+                self.info['incident_energy'] = '350gev'
+            else:
+                self.info['incident_energy'] = '200gev'
+        if 'plates' not in self.info:
+            if '8-4' in lowercase_name:
+                self.info['plates'] = (8, 4)
+            elif '7-5' in lowercase_name:
+                self.info['plates'] = (7, 5)
+            elif '6-6' in lowercase_name:
+                self.info['plates'] = (6, 6)
+        if 'no_cryo' not in self.info:
+            if 'nocryo' in lowercase_name:
+                self.info['no_cryo'] = True
+            else:
+                self.info['no_cryo'] = False
 
     def _check_input_path(self, input_path):
         assert os.path.isdir(input_path), \
