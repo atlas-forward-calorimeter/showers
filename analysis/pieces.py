@@ -17,6 +17,10 @@ _e_lims_350 = (0, 700)  # for 350 GeV
 _tube_e_lims_200 = tuple(lim / 15 for lim in _e_lims_200)
 _tube_e_lims_350 = tuple(lim / 15 for lim in _e_lims_350)
 
+# Filename to use when saving combined `Numbers` results from several
+# runs.
+_numbers_filename = 'all_runs'
+
 # Skip this many lines at the start when reading hits data files.
 _skiprows = 1
 
@@ -223,7 +227,7 @@ class Event(Piece):
 
     def _check_input_path(self, input_path):
         assert os.path.isfile(input_path), \
-            "Event data path isn't a file."
+            f"The event data path {input_path} isn't a file."
 
     def _input_path2name(self, input_path):
         return _file2name(input_path)
@@ -321,8 +325,10 @@ class Run(Piece):
                 self.info['no_cryo'] = False
 
     def _check_input_path(self, input_path):
-        assert os.path.isdir(input_path), \
-            "Run directory path isn't actually a directory."
+        assert os.path.isdir(input_path), (
+            f"The run directory {input_path} isn't actually a"
+            f" directory."
+        )
 
     def _input_path2name(self, input_path):
         return _dir2name(input_path)
@@ -330,47 +336,61 @@ class Run(Piece):
 
 def go(out_dir, *run_dirs):
     """
-    Analyze a bunch of runs.
+    Analyze a bunch of runs and output their results in an organized
+    folder.
 
     :param out_dir: Where to save all the results, if at all.
     :type out_dir: str
     :param run_dirs: Locations of the run data directories.
     :type run_dirs: [str]
     :return:
-    :rtype: None
+    :rtype:
     """
-    if out_dir.lower() == 'none':
-        out_dir = None
+    if len(run_dirs) == 1:
+        return [Run(run_dirs[0], out_dir)]
 
-    for run_dir in run_dirs:
-        Run(run_dir, out_dir, info=_run_params(run_dir))
+    runs = [
+        Run(
+            events_path=run_dir,
+            out_dir=os.path.join(out_dir, _dir2name(run_dir))
+        )
+        for run_dir in run_dirs
+    ]
+    calc.save_dataframe(
+        dataframe=pandas.concat(
+            (run.numbers.resultss for run in runs),
+            ignore_index=True
+        ),
+        path=os.path.join(out_dir, _numbers_filename)
+    )
+    return runs
 
 
-def _file2name(file):
+def _file2name(file_path):
     """
-    Turn a file path into a nicer name.
+    Return the name of the file at `file_path` without its extension.
 
-    :param file: File path.
-    :type file: str
+    :param file_path: File path.
+    :type file_path: str
     :return: Nice name.
     :rtype: str
     """
-    tail, head = os.path.split(file)
-    assert head != '', "Is this a directory instead of a file?"
+    tail, head = os.path.split(file_path)
+    assert head != '', "Is this a directory instead of a file_path?"
 
     return head.split('.')[0]
 
 
-def _dir2name(directory):
+def _dir2name(dir_path):
     """
-    Turn a directory path into a nicer name.
+    Return the name of the directory at `dir_path`.
 
-    :param directory: Directory path.
-    :type directory: str
+    :param dir_path: Directory path.
+    :type dir_path: str
     :return: Nice name.
     :rtype: str
     """
-    tail, head = os.path.split(directory)
+    tail, head = os.path.split(dir_path)
     if head == '':
         tail, head = os.path.split(tail)
 

@@ -119,26 +119,8 @@ class Calc(abc.ABC):
 
         filename = '.'.join((self.save_name, _data_format))
         filepath = os.path.join(self.save_dir, filename)
-        excel_filename = self.save_name + '-excel.xlsx'
-        excel_filepath = os.path.join(self.save_dir, excel_filename)
 
-        header = (  # Inserted at the top of the output file.
-            'FCal and SCal analysis output.'
-            f' {datetime.datetime.now().ctime()}'
-        )
-        output = '\n'.join((
-            header,
-            self.resultss.to_string(index=False),
-            ''
-        ))
-        with open(filepath, 'w') as file:
-            file.write(output)
-
-        # Save to excel format since Office 365 prohibits the use of
-        # space delimited csv's.
-        self.resultss.to_excel(excel_filepath, index=False)
-
-        return filepath
+        return save_dataframe(self.resultss, filepath)
 
     def _assert_single_entry(self):
         """Make sure only one set of results has been added."""
@@ -740,6 +722,38 @@ class EnergyVsXY(Histogram):
         ax.set_ylim(self.__xy_lims[1])
 
         return fig, ax
+
+
+def save_dataframe(dataframe, path):
+    """
+    Write a DataFrame to a csv file with nicely spaced columns and a
+    header, and also write it to a second file compatible with Office
+    365 (since it seems to prohibit the use of csv's).
+
+    :param dataframe: The DataFrame to save.
+    :param path: Path to save the files at. The extension of the
+        filename at `path` is ignored and replaced with 'csv' and
+        'xlsx'.
+    :return: The paths to the saved files, (csv_path, excel_path).
+    """
+    tail, ext = os.path.splitext(path)
+
+    csv_path = tail + '.csv'
+    header = (
+        'FCal and SCal analysis output.'
+        f' {datetime.datetime.now().ctime()}'
+    )
+    with open(csv_path, 'w') as file:
+        file.write('\n'.join((
+            header,
+            dataframe.to_string(index=False),
+            ''
+        )))
+
+    excel_path = tail + '.xlsx'
+    dataframe.to_excel(excel_path, index=False)
+
+    return csv_path, excel_path
 
 
 def _split_plot(
