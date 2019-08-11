@@ -110,7 +110,7 @@ class Piece(abc.ABC):
         """Get histogram titles from the Piece info. Returns the same
         title for both z and xy histograms.
         """
-        title = 'E dep density.'
+        title = 'E dep density.{}'
 
         incident_energy = self.info.get('incident_energy')
         if incident_energy == '350gev':
@@ -125,7 +125,7 @@ class Piece(abc.ABC):
         if self.info.get('no_cryo'):
             title += ' No cryo.'
 
-        return title, title
+        return title.format(''), title.format(' Middle tubes.')
 
     def _update_info(self):
         """Update this Piece's info (with access to all the defaults
@@ -234,6 +234,7 @@ class Event(Piece):
         self.hists['energy_vs_z'].plot_single(
             energy_label=self._energy_label(self.numbers.get()['middle_e_dep'])
         )
+        self.hists['energy_vs_xy'].plot_single()
 
     def _update_info(self):
         event_number = int(self.name.split('-')[-1])
@@ -241,7 +242,7 @@ class Event(Piece):
 
     def _get_titles(self):
         z_title, xy_title = (
-            title + f" Event {self.info['event']}."
+            f"{title} Event {self.info['event']}."
             for title in super()._get_titles()
         )
         return z_title, xy_title
@@ -292,6 +293,7 @@ class Run(Piece):
         )
         self.hists['energy_vs_z'].plot_means(energy_label=energy_label)
         self.hists['energy_vs_z'].plot_multi(energy_label=energy_label)
+        self.hists['energy_vs_xy'].plot_means()
 
         # Print out that we're done.
         print(f'Run {self.name} is finished!')
@@ -386,13 +388,15 @@ def go(out_dir, *run_dirs):
             warnings.warn(f"Couldn't analyze the directory ' {run_dir}.")
     assert runs, "Couldn't successfully analyze any runs!"
 
-    calc.save_dataframe(
-        dataframe=pandas.concat(
-            (run.numbers.resultss for run in runs),
-            ignore_index=True
-        ),
-        path=os.path.join(out_dir, _numbers_filename)
-    )
+    if out_dir:
+        calc.save_dataframe(
+            dataframe=pandas.concat(
+                (run.numbers.resultss for run in runs),
+                ignore_index=True
+            ),
+            path=os.path.join(out_dir, _numbers_filename)
+        )
+
     return runs
 
 

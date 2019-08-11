@@ -492,7 +492,7 @@ class EnergyVsZ(Histogram):
         fig.suptitle(self.title + f' {num_events} events.')
         self.__label_middle(ax_middle, energy_label)
 
-        kwargs = {'linewidth': _linewidth, 'alpha': 0.5}
+        kwargs = {'linewidth': _linewidth, 'alpha': 1 / len(self.resultss)}
         colors = itertools.cycle((
             'red', 'orange', 'yellow', 'pink', 'purple', 'brown', 'black'
         ))
@@ -665,21 +665,30 @@ class EnergyVsXY(Histogram):
             _make_bins(limits[0], limits[1], self.bin_density)
             for limits in self.__xy_lims
         )
-        self.__bin_midss = tuple(
-            _make_bin_midpoints(bins) for bins in self.__binss
-        )
+        self.__binss_mesh = numpy.meshgrid(*self.__binss)
+        # self.__bin_midss = tuple(
+        #     _make_bin_midpoints(bins) for bins in self.__binss
+        # )
 
     def plot_single(self, i=None, save=True):
         fig, ax = self._make_fig_and_axes()
         fig.suptitle(self.title)
 
-        grid_x, grid_y = numpy.meshgrid(*self.__binss)
-        ax.pcolormesh(grid_x, grid_y, self._to_density(self.get(i)))
+        ax.pcolormesh(*self.__binss_mesh, self._to_density(self.get(i)))
 
-        self.save_fig(fig, file_suffix='xy')
+        if save:
+            self.save_fig(fig, file_suffix='xy')
 
     def plot_means(self):
-        pass
+        fig, ax = self._make_fig_and_axes()
+        fig.suptitle(self.title + ' Averaged.')
+
+        ax.pcolormesh(
+            *self.__binss_mesh,
+            self._to_density(numpy.mean(self.resultss, axis=0))
+        )
+
+        self.save_fig(fig, file_suffix='xy')
 
     def get(self, i=None):
         """
@@ -719,8 +728,11 @@ class EnergyVsXY(Histogram):
         ax.set_xlabel(f'x ({self.length_units})')
         ax.set_ylabel(f'y ({self.length_units})')
 
-        ax.set_xlim(self.__xy_lims[0])
+        # No need to set x limits since the axes will be equal.
+        # ax.set_xlim(self.__xy_lims[0])
         ax.set_ylim(self.__xy_lims[1])
+
+        ax.set_aspect('equal')
 
         return fig, ax
 
