@@ -1,9 +1,11 @@
 """Analyzing data in "pieces." Events, Runs, etc.
 
-TODO: Take out randomness in incident beta?
+TODO: Mention that there are less gaps than plates.
 TODO: Record that the event with the proton was run 8-4 event 5.
+TODO: Mention the proton in the powerpoint!
 TODO: Consider switching to a 16x9 aspect ratio.
-TODO: Remove titles completely.
+TODO: Take out randomness in incident beta?
+TODO: Remove titles completely?
 """
 
 import abc
@@ -18,6 +20,19 @@ _e_lims_200 = (0, 350)  # for 200 GeV
 _e_lims_350 = (0, 700)  # for 350 GeV
 _tube_e_lims_200 = tuple(lim / 15 for lim in _e_lims_200)
 _tube_e_lims_350 = tuple(lim / 15 for lim in _e_lims_350)
+
+# Energy-z histogram limits for the 8 by 4 plate arrangements. The
+# limits for the 7 by 7 and 6 by 6 arrangements are shifted towards
+# -z in increments of length equal to the `_plate_separation`.
+_z_lims = {(8, 4): (-50, 80)}
+_plate_separation = 4 + 3.5
+for i, plates in enumerate(((7, 5), (6, 6)), start=1):
+    _z_lims[plates] = tuple(
+        # Subtract multiples of the `_plate_separation` from the 8 by 4
+        # limits.
+        lim - _plate_separation * i for lim in _z_lims[(8, 4)]
+    )
+
 
 # Filename to use when saving combined `Numbers` results from several
 # runs.
@@ -79,10 +94,10 @@ class Piece(abc.ABC):
 
         self.hists = {}
 
-        e_lims, tube_e_lims = self.__get_e_lims()
+        e_lims, tube_e_lims, z_lims = self.__get_e_z_lims()
         z_title, xy_title = self._get_titles()
         self.hists['energy_vs_z'] = calc.EnergyVsZ(
-            self, e_lims, tube_e_lims, z_title
+            self, e_lims, tube_e_lims, z_title, z_lims=z_lims
         )
         self.hists['energy_vs_xy'] = calc.EnergyVsXY(self, xy_title)
 
@@ -117,12 +132,13 @@ class Piece(abc.ABC):
         that are set in __init__). Implemented in the concrete Pieces.
         """
 
-    def __get_e_lims(self):
+    def __get_e_z_lims(self):
         """
-        Get energy plot limits (full and tubes) from Piece info.
+        Get the energy-z plot limits for both sets of axes (full and
+        tubes) from Piece info.
 
         :param info: The Piece info.
-        :return: Energy plot limits (full and tubes).
+        :return: Energy plot limits.
         """
         if ('incident_energy' not in self.info) \
                 or (self.info['incident_energy'] == '350gev'):
@@ -131,7 +147,10 @@ class Piece(abc.ABC):
         else:
             e_lims = _e_lims_200
             tube_e_lims = _tube_e_lims_200
-        return e_lims, tube_e_lims
+
+        z_lims = _z_lims.get(self.info.get('plates')) or _z_lims[(8, 4)]
+
+        return e_lims, tube_e_lims, z_lims
 
     @staticmethod
     def _energy_label(e_dep, std=None):
