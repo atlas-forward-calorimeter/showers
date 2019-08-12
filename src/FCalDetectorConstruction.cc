@@ -277,8 +277,8 @@ void FCalDetectorConstruction::SetupGeometry()
 
     for (int it = 0; it < numCals; it++)
     {
-        tshifty[it] = -tubtriside / 4 * sqrt(3.) * pow(-1, it);
         tshiftx[it] = tubtriside / 4 * (it * 2 - 3);
+        tshifty[it] = -tubtriside / 4 * sqrt(3.) * pow(-1, it);
         tshiftz[it] = 0;
         Trh[it] = G4Transform3D(
             Rth, G4ThreeVector(tshiftx[it], tshifty[it], tshiftz[it]));

@@ -243,20 +243,31 @@ class Numbers(Calc):
     def __tubes(data):
         """TODO: Document and organize this."""
         offset = 7.5 / 4
-		# TODO: Change default to self.
-        data = data[numpy.logical_and(_default_middle_z_lims[0] < data.z, data.z < _default_middle_z_lims[1])]
+        # TODO: Change default to self.
+        data = data[numpy.logical_and(
+            _default_middle_z_lims[0] < data.z,
+            data.z < _default_middle_z_lims[1]
+        )]
 
-        right = data.z > 0
-        left = data.z <= 0
-        top_right = numpy.logical_and(right, data.y > offset)
-        bottom_right = numpy.logical_and(right, data.y < offset)
-        top_left = numpy.logical_and(left, data.y > -offset)
-        bottom_left = numpy.logical_and(left, data.y < -offset)
-        top_right_sum = data.energy_deposit[top_right].sum()
-        top_left_sum = data.energy_deposit[top_left].sum()
+        bottom = data.y <= 0
+        top = data.y > 0
+
+        bottom_left = numpy.logical_and(bottom, data.x <= -offset)
+        bottom_right = numpy.logical_and(bottom, data.x > -offset)
+        top_left = numpy.logical_and(top, data.x <= offset)
+        top_right = numpy.logical_and(top, data.x > offset)
+
         bottom_left_sum = data.energy_deposit[bottom_left].sum()
         bottom_right_sum = data.energy_deposit[bottom_right].sum()
-        return {'top_right': top_right_sum, 'top_left': top_left_sum, 'bottom_left': bottom_left_sum, 'bottom_right': bottom_right_sum}
+        top_left_sum = data.energy_deposit[top_left].sum()
+        top_right_sum = data.energy_deposit[top_right].sum()
+
+        return {
+            'top_right': top_right_sum,
+            'top_left': top_left_sum,
+            'bottom_left': bottom_left_sum,
+            'bottom_right': bottom_right_sum
+        }
 
 
 class Histogram(Calc):
@@ -492,7 +503,7 @@ class EnergyVsZ(Histogram):
         fig.suptitle(self.title + f' {num_events} events.')
         self.__label_middle(ax_middle, energy_label)
 
-        kwargs = {'linewidth': _linewidth, 'alpha': 1 / len(self.resultss)}
+        kwargs = {'linewidth': _linewidth, 'alpha': 0.2}
         colors = itertools.cycle((
             'red', 'orange', 'yellow', 'pink', 'purple', 'brown', 'black'
         ))
@@ -711,9 +722,11 @@ class EnergyVsXY(Histogram):
         sliced = data[numpy.logical_and(
             self.__z_lims[0] <= data.z, data.z <= self.__z_lims[1]
         )]
+        # Transpose the sums to match the xy/Cartesian indexing used by
+        # `numpy.meshgrid` and Matplotlib's `pcolormesh`.
         return numpy.histogram2d(
             sliced.x, sliced.y, bins=self.__binss, weights=sliced.energy_deposit
-        )[0]
+        )[0].T
 
     def _check_results(self, sums):
         """Check that `sums` is the correct shape for the bins."""

@@ -2,6 +2,7 @@
 
 TODO: Mention that there are less gaps than plates.
 TODO: Record that the event with the proton was run 8-4 event 5.
+TODO: Mention in the powerpoint that the energy-xy histograms are normalized.
 TODO: Mention the proton in the powerpoint!
 TODO: Consider switching to a 16x9 aspect ratio.
 TODO: Take out randomness in incident beta?
@@ -10,6 +11,7 @@ TODO: Remove titles completely?
 
 import abc
 import os
+import textwrap
 import warnings
 
 import pandas
@@ -36,7 +38,7 @@ for i, plates in enumerate(((7, 5), (6, 6)), start=1):
 
 # Filename to use when saving combined `Numbers` results from several
 # runs.
-_numbers_filename = 'all_runs'
+_numbers_filename = 'all-runs'
 
 # Skip this many lines at the start when reading hits data files.
 _skiprows = 1
@@ -49,10 +51,13 @@ class Piece(abc.ABC):
     Attributes:
         name: A nice name to go by.
         hists: Contains all of the Histograms.
+        title_width: Wrap plot titles to fit this many characters.
 
     TODO: Document this.
     TODO: Parse paths and make titles.
     """
+
+    title_width = 34
 
     def __init__(self, input_path, parent=None, out_dir=None, info=None):
         """
@@ -112,6 +117,9 @@ class Piece(abc.ABC):
         """
         title = 'E dep density.{}'
 
+        if self.info.get('offset_beam'):
+            title += ' Offset $e^-.$'
+
         incident_energy = self.info.get('incident_energy')
         if incident_energy == '350gev':
             title += ' 350 GeV $e^-.$'
@@ -124,6 +132,15 @@ class Piece(abc.ABC):
 
         if self.info.get('no_cryo'):
             title += ' No cryo.'
+
+        # Add energy density descriptions and wrap the titles to meet
+        # the `title_width`.
+        z_title, xy_title = (
+            '\n'.join(textwrap.wrap(
+                title.format(description), width=self.title_width
+            ))
+            for description in ('', ' Middle tubes.')
+        )
 
         return title.format(''), title.format(' Middle tubes.')
 
@@ -330,9 +347,9 @@ class Run(Piece):
     #     return super().__get_e_lims()
 
     def _update_info(self):
+        """Parse the folder name and update the Run's info."""
         lowercase_name = self.name.lower()
         if 'incident_energy' not in self.info:
-            # Parse the folder name.
             if '350gev' in lowercase_name:
                 self.info['incident_energy'] = '350gev'
             else:
@@ -345,10 +362,13 @@ class Run(Piece):
             elif '6-6' in lowercase_name:
                 self.info['plates'] = (6, 6)
         if 'no_cryo' not in self.info:
-            if 'nocryo' in lowercase_name:
-                self.info['no_cryo'] = True
-            else:
-                self.info['no_cryo'] = False
+            self.info['no_cryo'] = (
+                True if 'nocryo' in lowercase_name else False
+            )
+        if 'offset_beam' not in self.info:
+            self.info['offset_beam'] = (
+                True if 'offset' in lowercase_name else False
+            )
 
     def _check_input_path(self, input_path):
         assert os.path.isdir(input_path), (
@@ -378,12 +398,7 @@ def go(out_dir, *run_dirs):
     runs = []
     for run_dir in run_dirs:
         try:
-            runs.append(
-                Run(
-                    events_path=run_dir,
-                    out_dir=os.path.join(out_dir, _dir2name(run_dir))
-                )
-            )
+            runs.append(Run(events_path=run_dir, out_dir=out_dir))
         except:
             warnings.warn(f"Couldn't analyze the directory ' {run_dir}.")
     assert runs, "Couldn't successfully analyze any runs!"
