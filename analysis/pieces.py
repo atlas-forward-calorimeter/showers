@@ -1,11 +1,6 @@
 """Analyzing data in "pieces." Events, Runs, etc.
 
-TODO: Mention that there are less gaps than plates.
-TODO: Record that the event with the proton was run 8-4 event 5.
-TODO: Mention in the powerpoint that the energy-xy histograms are normalized.
-TODO: Mention the proton in the powerpoint!
 TODO: Consider switching to a 16x9 aspect ratio.
-TODO: Take out randomness in incident beta?
 TODO: Remove titles completely?
 """
 
@@ -48,13 +43,14 @@ class Piece(abc.ABC):
     """
     A "piece" of analysis.
 
-    Attributes:
-        name: A nice name to go by.
-        hists: Contains all of the Histograms.
-        title_width: Wrap plot titles to fit this many characters.
+    TODO: Document this more.
 
-    TODO: Document this.
-    TODO: Parse paths and make titles.
+        Attributes:
+            name: A nice name to go by.
+
+            hists: Contains all of the Histograms.
+
+            title_width: Wrap plot titles to fit this many characters.
     """
 
     title_width = 34
@@ -289,10 +285,6 @@ class Run(Piece):
         parent = None
         super().__init__(events_path, parent, out_dir, info)
 
-        # if 'incident_energy' not in self.info:
-        #     self.info['incident_energy'] = '350GeV'
-        # TODO: Remove.
-
         self.go()
 
     def go(self):
@@ -334,17 +326,6 @@ class Run(Piece):
         for filename in files:
             if 'hits' in filename:
                 yield os.path.join(root, filename)
-
-    # def __get_e_lims(self):
-    #     # Update info here so that the Run name can be used.
-    #     # TODO: Remove.
-    #     if 'incident_energy' not in self.info:
-    #         # Parse the folder name.
-    #         if '350gev' in self.name.lower():
-    #             self.info['incident_energy'] = '350gev'
-    #         else:
-    #             self.info['incident_energy'] = '200gev'
-    #     return super().__get_e_lims()
 
     def _update_info(self):
         """Parse the folder name and update the Run's info."""
