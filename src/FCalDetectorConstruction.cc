@@ -22,6 +22,7 @@ Edited by Anson Kost with the help of Professor John Rutherfoord, May 2019.
 #include "G4Material.hh"
 #include "G4NistManager.hh"
 
+#include "G4UnionSolid.hh"
 #include "G4VSolid.hh"
 #include "G4Box.hh"
 #include "G4Tubs.hh"
@@ -212,16 +213,24 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4double spaceThickness = 0.05 * CLHEP::mm;  // between foil & rod
 
 	//// PEEK Box
-	G4double boxX = 20. * CLHEP::mm;
-	G4double boxY = 20. * CLHEP::mm;
+
+    // Rotate the tube cals and the cavities in the PEEK box that house them
+    // about the y-axis through an angle `tubesAngle`.
+    G4double tubesAngle = -0 * CLHEP::degree;
+
+    // Extra width to enclose rotated tubes.
+	G4double boxX = (20 + 8) * CLHEP::mm;
+
+	G4double boxY = 20 * CLHEP::mm;
 	G4double boxZ = 43.5 / 2 * CLHEP::mm;
 
-	//// Tungsten Plates
+	//// Tungsten Plates and Gaps
 	G4double plateX = 30 / 2 * CLHEP::mm;
 	G4double plateY = plateX;
     G4double plateZ = 3.5 / 2 * CLHEP::mm;
-	G4double tunghzTot = plateX;
-	G4double larGThz = 4 / 2 * CLHEP::mm;
+    G4double gapX = 40 / 2 * CLHEP::mm;
+    G4double gapY = 40 / 2 * CLHEP::mm;
+	G4double gapZ = 4 / 2 * CLHEP::mm;
 	int tungPN = 8;		// # of front plates
 	int tungBPN = 4;	// # of back plates
 
@@ -265,64 +274,6 @@ void FCalDetectorConstruction::SetupGeometry()
 		false,				// Unused boolean parameter
 		0					// Copy number
 	);
-
-    ///|////////////////////////////////////////////////////////////////////
-    //|| PEEK Box
-    ///|////////////////////////////////////////////////////////////////////
-    double tshifty[numCals];
-    double tshiftx[numCals];
-    double tshiftz[numCals];    // Zero.
-    G4RotationMatrix Rth;       // No rotation.
-    G4Transform3D Trh[numCals];
-
-    for (int it = 0; it < numCals; it++)
-    {
-        tshiftx[it] = tubtriside / 4 * (it * 2 - 3);
-        tshifty[it] = -tubtriside / 4 * sqrt(3.) * pow(-1, it);
-        tshiftz[it] = 0;
-        Trh[it] = G4Transform3D(
-            Rth, G4ThreeVector(tshiftx[it], tshifty[it], tshiftz[it]));
-    }
-
-    G4Box* outBox = new G4Box(
-        "outBox",			// Name
-        boxX,				// half x thick
-        boxY,				// half y thick
-        boxZ				// half z thick
-    );
-    G4Tubs* tubHole = new G4Tubs(
-        "tubHole",			// Name
-        0,					// Inner radius
-        tubHoleRadius,		// Outer radius
-        boxZ,				// Half length in z
-        0,					// Starting phi angle
-        360					// Segment angle	
-    );
-
-    G4SubtractionSolid *peekBox0 = new G4SubtractionSolid(
-        "peekBox0", outBox, tubHole, Trh[0]);
-    G4SubtractionSolid *peekBox1 = new G4SubtractionSolid(
-        "peekBox1", peekBox0, tubHole, Trh[1]);
-    G4SubtractionSolid *peekBox2 = new G4SubtractionSolid(
-        "peekBox2", peekBox1, tubHole, Trh[2]);
-    G4SubtractionSolid *peekBox3 = new G4SubtractionSolid(
-        "peekBox3", peekBox2, tubHole, Trh[3]);
-
-    G4LogicalVolume* peekBoxLogical = new G4LogicalVolume(
-        peekBox3,	// Solid
-        PEEK,		// Material
-        "peekBox_Logical"
-    );
-
-    new G4PVPlacement(
-        0,                          // Rotation matrix
-        G4ThreeVector(0, 0, 0),		// Translation vector
-        peekBoxLogical,				// Logical volume
-        "peekBox_Physical",
-        fpWorldLogical,
-        false,
-        0
-    );
 
     ///|////////////////////////////////////////////////////////////////////
     //|| Calorimeter Tubes
@@ -457,8 +408,7 @@ void FCalDetectorConstruction::SetupGeometry()
 	G4LogicalVolume* tubeRLogical = new G4LogicalVolume(
 		tubeSolidR, titanium, "TubeR_Logical");
 
-    //|| Assemble and Place Calorimeters ///////////////////////////////////
-
+    //|| Assemble Single Tube Cal //////////////////////////////////////////
     G4AssemblyVolume* assemblyTube = new G4AssemblyVolume();
     G4Transform3D Tr0;
     G4RotationMatrix Ro;
@@ -497,13 +447,97 @@ void FCalDetectorConstruction::SetupGeometry()
     assemblyTube->AddPlacedVolume(
         tubeRLogical, Tr0);
 
-    for (int it = 0; it < numCals; it++)
+    //|| Four Tubes ////////////////////////////////////////////////////////
+
+    //// The shifts of the tube cals relative to their center.
+    G4Transform3D tubeShifts[numCals];
+    for (int i = 0; i < numCals; i++)
     {
-        // four tube
-        Tr0 = G4Transform3D(
-            Ro, G4ThreeVector(tshiftx[it], tshifty[it], tshiftz[it]));
-        assemblyTube->MakeImprint(fpWorldLogical, Tr0);
+        tubeShifts[i] = G4Transform3D(G4RotationMatrix(), G4ThreeVector(
+            tubtriside / 4 * (2 * i - 3), 
+            -tubtriside / 4 * sqrt(3.) * pow(-1, i),
+            0
+        ));
     }
+
+    //// Shifts relative to the center of the top right tube.
+    G4Transform3D relativeTubeShifts[numCals];
+    for (int i = 0; i < numCals; i++) {
+        relativeTubeShifts[i] = G4Transform3D(
+            G4RotationMatrix(), 
+            tubeShifts[i].getTranslation() - tubeShifts[3].getTranslation()
+        );
+    }
+
+    G4AssemblyVolume* assembly4tubes = new G4AssemblyVolume();
+    for (auto relTubeShift : relativeTubeShifts)
+        // Placed such that the origin is at the "upper right" (+x and +y)
+        // tube cal.
+        assembly4tubes->AddPlacedAssembly(assemblyTube, relTubeShift);
+
+    ///|////////////////////////////////////////////////////////////////////
+    //|| PEEK Box
+    ///|////////////////////////////////////////////////////////////////////
+
+    // Rotation of the tube cals and their shift relative to their origin in
+    // the "upper right" tube.
+    G4RotationMatrix tubesRotation = G4RotationMatrix();
+    tubesRotation.rotateY(tubesAngle);
+    G4Transform3D tubesTransform = G4Transform3D(
+        tubesRotation, tubeShifts[3].getTranslation()
+    );
+
+    // Cylindrical cavities in the box which house the tubes.
+    G4Tubs* tubHole = new G4Tubs(
+        "TubHole",			        // Name
+        0,					        // Inner radius
+        tubHoleRadius,		        // Outer radius
+
+        // This length ensures that the hole solid is longer than all dimensions 
+        // of the PEEK box.
+        2 * (boxX + boxY + boxZ),	// Half length in z
+
+        0,					        // Starting phi angle
+        360					        // Segment angle	
+    );
+    //////////////////////////////////////////// TODO: Make this logic prettier.
+    // Placed such that the origin is at the "upper right" (+x and +y)
+    // tube cal.
+    G4UnionSolid* fhs = new G4UnionSolid(
+        "Union", tubHole, tubHole, relativeTubeShifts[0]);
+    fhs = new G4UnionSolid(
+        "Union", fhs, tubHole, relativeTubeShifts[1]);
+    fhs = new G4UnionSolid(
+        "FourHoles", fhs, tubHole, relativeTubeShifts[2]);
+
+    G4Box* holelessPEEKbox = new G4Box(
+        "Holeless_PEEK_Box",    // Name
+        boxX,				    // half x thick
+        boxY,				    // half y thick
+        boxZ				    // half z thick
+    );
+    G4SubtractionSolid* PEEKbox = new G4SubtractionSolid(
+        "PEEK_Box", holelessPEEKbox, fhs, tubesTransform);
+    G4LogicalVolume* PEEKboxLogical = new G4LogicalVolume(
+        PEEKbox,    // Solid
+        PEEK,	    // Material
+        "PEEKBox_Logical"
+    );
+
+    //|| Assemble and Place PEEK Box and Tube Cals /////////////////////////
+    G4Transform3D identityTransform = G4Transform3D();
+    G4RotationMatrix identityRotation = G4RotationMatrix();
+
+    // The PEEK box and everything inside, i.e. the tube cals, are placed 
+    // in this "assembly box."
+    G4AssemblyVolume* assemblyBox = new G4AssemblyVolume();
+
+    // Place the PEEK box and tubes in the assembly box.
+    assemblyBox->AddPlacedVolume(PEEKboxLogical, identityTransform);
+    assemblyBox->AddPlacedAssembly(assembly4tubes, tubesTransform);
+
+    // Place the assembly box in the world.
+    assemblyBox->MakeImprint(fpWorldLogical, identityTransform);
 
     ///|////////////////////////////////////////////////////////////////////
     //|| Tungsten Plate Series
@@ -516,9 +550,9 @@ void FCalDetectorConstruction::SetupGeometry()
         tungPlate, tungsten, "tungPlate_Logical");
 
     G4Box* larGapTp = new G4Box("larGapTp",		// Name
-        boxX,									// half x thick
-        boxY,									// half y thick
-        larGThz);								// half z thick
+        gapX,									// half x thick
+        gapY,									// half y thick
+        gapZ);								// half z thick
     G4LogicalVolume* larGapTpLogical = new G4LogicalVolume(
         larGapTp, lar, "Gap_Logical");
 
@@ -532,7 +566,7 @@ void FCalDetectorConstruction::SetupGeometry()
             G4ThreeVector(0, 0,
                 boxZ \
                 + plateZ \
-                + 2 * (plateZ + larGThz) * itunp
+                + 2 * (plateZ + gapZ) * itunp
             ),
             tungPlateLogical,   // Logical volume
             "tungPlate_Physical",
@@ -541,8 +575,8 @@ void FCalDetectorConstruction::SetupGeometry()
             0
         );
 
-        LarGapcenter = boxZ + 2 * plateZ + larGThz \
-            + 2 * (plateZ + larGThz) * itunp;
+        LarGapcenter = boxZ + 2 * plateZ + gapZ \
+            + 2 * (plateZ + gapZ) * itunp;
 
         new G4PVPlacement(
             0,										//Rotation matrix
@@ -564,7 +598,7 @@ void FCalDetectorConstruction::SetupGeometry()
                     0, 0,
                     -(boxZ
                       + plateZ
-                      + 2 * (plateZ + larGThz) * itunp)
+                      + 2 * (plateZ + gapZ) * itunp)
                 ),
                 tungPlateLogical,  //Logical volume
                 "tungPlate_Physical",
@@ -592,7 +626,7 @@ void FCalDetectorConstruction::SetupGeometry()
         G4ThreeVector(0, 0,
             boxZ \
             + plateZ \
-            + 2 * (plateZ + larGThz) * (tungPN - 1)
+            + 2 * (plateZ + gapZ) * (tungPN - 1)
         ),
         tungPlateLogical,   //Logical volume
         "tungPlate_Physical",
@@ -608,7 +642,7 @@ void FCalDetectorConstruction::SetupGeometry()
         G4ThreeVector(0, 0,
             -(boxZ
               + plateZ
-              + 2 * (plateZ + larGThz) * (tungBPN - 1))
+              + 2 * (plateZ + gapZ) * (tungBPN - 1))
         ),
         tungPlateLogical,   //Logical volume
         "tungPlate_Physical",
@@ -627,7 +661,7 @@ void FCalDetectorConstruction::SetupGeometry()
     cryoRotation.rotateX(90 * CLHEP::degree);
     G4double cryoPosZ = \
         cryoFrontSepZ
-        + boxZ + 2 * (plateZ + larGThz) * (tungPN - 1) + 2 * plateZ
+        + boxZ + 2 * (plateZ + gapZ) * (tungPN - 1) + 2 * plateZ
         - sqrt(pow(cryoIIRadius, 2) - pow(cryoPosX, 2));
     G4Transform3D cryoTransform = G4Transform3D(
         cryoRotation,
@@ -701,7 +735,8 @@ void FCalDetectorConstruction::SetupGeometry()
 		new G4VisAttributes(G4Colour(1.0, 0.2, 0.2, 1.0)),	// Hot Red      1.0
 		new G4VisAttributes(G4Colour(0.0, 0.5, 0.5, 1.0)),	// Argon Green  0.15
 		new G4VisAttributes(G4Colour(0.5, 0.5, 0.5, 1.0)),	// Silver       0.3
-		new G4VisAttributes(G4Colour(0.4, 0.15, 0.4, 1.0))	// Tungsten     0.3
+        new G4VisAttributes(G4Colour(0.4, 0.15, 0.4, 1.0)),	// Tungsten     0.3
+        new G4VisAttributes(G4Colour(1.0, 1.0, 1.0, 0.3))	// White Smoke
 	};
 	for (const auto& color : colors) {
 		color->SetForceSolid(true);
@@ -719,6 +754,7 @@ void FCalDetectorConstruction::SetupGeometry()
         {cryoInnerWallLogical, colors[2]},
         {cryoMiddleLogical, colors[1]},
         {cryoOuterWallLogical, colors[2]},
+        {PEEKboxLogical, colors[4]}
 	};
 	for (const auto& p : colorMap) {
 		p.first->SetVisAttributes(p.second);
