@@ -219,18 +219,23 @@ void FCalDetectorConstruction::SetupGeometry()
     G4double tubesAngle = -0 * CLHEP::degree;
 
     // Extra width to enclose rotated tubes.
-	G4double boxX = (20 + 8) * CLHEP::mm;
+	G4double boxX = (40 / 2 + 8) * CLHEP::mm;
 
-	G4double boxY = 20 * CLHEP::mm;
+	G4double boxY = 40 / 2 * CLHEP::mm;
 	G4double boxZ = 43.5 / 2 * CLHEP::mm;
 
 	//// Tungsten Plates and Gaps
+
+    // Gap between the PEEK box and the nearest plate on either side 
+    // (half-length in z).
+    G4double plate2box = 13.075 / 2 * CLHEP::mm;
+
 	G4double plateX = 30 / 2 * CLHEP::mm;
 	G4double plateY = plateX;
     G4double plateZ = 3.5 / 2 * CLHEP::mm;
     G4double gapX = 40 / 2 * CLHEP::mm;
     G4double gapY = 40 / 2 * CLHEP::mm;
-	G4double gapZ = 4 / 2 * CLHEP::mm;
+	G4double gapZ = 4.15 / 2 * CLHEP::mm;
 	int tungPN = 8;		// # of front plates
 	int tungBPN = 4;	// # of back plates
 
@@ -241,8 +246,10 @@ void FCalDetectorConstruction::SetupGeometry()
     G4double cryoOuterThickness = 2.29 * CLHEP::mm;   // outer wall thickness
     G4double cryoPosX = -38.5 * CLHEP::mm;
     G4double cryoPosY = 0;
-    // separation between inner cryostat and front plate
+
+    // Separation between inner cryostat and front plate.
     G4double cryoFrontSepZ = 24.27 * CLHEP::mm;
+
     G4double cryoHalfLength = 100 / 2 * CLHEP::mm;
     G4double cryoStartAngle = 30 * CLHEP::degree;     // angular bounds
     G4double cryoStopAngle = 100 * CLHEP::degree;
@@ -542,42 +549,63 @@ void FCalDetectorConstruction::SetupGeometry()
     ///|////////////////////////////////////////////////////////////////////
     //|| Tungsten Plate Series
     ///|////////////////////////////////////////////////////////////////////
-    G4Box* tungPlate = new G4Box("tungPlate",	// Name
-        plateX,									// half x thick
-        plateY,									// half y thick
-        plateZ);			                    // half z thick
+    // Fill the gaps between the PEEK box and the plates with "dead" liquid 
+    // argon (does not record hits).
+    G4Box* plateBoxGap = new G4Box(
+        "PlateBoxGap",	    // Name
+        gapX,			    // half x thick
+        gapY,		        // half y thick
+        plate2box);	        // half z thick
+    G4LogicalVolume* plateBoxGapLogical = new G4LogicalVolume(
+        plateBoxGap, lar, "PlateBoxGap_Logical");
+    G4ThreeVector plateBoxGapShift = G4ThreeVector(0, 0, boxZ + plate2box);
+    for (int i = -1; i < 3; i = i + 2) {  // i = -1, 1
+        new G4PVPlacement(
+            0,							//Rotation matrix
+            i * plateBoxGapShift,		//Translation vector
+            plateBoxGapLogical,			//Logical volume
+            "PlateBoxGap_Physical",
+            fpWorldLogical,
+            false,
+            0
+        );
+    }
+
+    G4Box* tungPlate = new G4Box(
+        "tungPlate",	// Name
+        plateX,			// half x thick
+        plateY,		    // half y thick
+        plateZ);	    // half z thick
     G4LogicalVolume* tungPlateLogical = new G4LogicalVolume(
         tungPlate, tungsten, "tungPlate_Logical");
 
-    G4Box* larGapTp = new G4Box("larGapTp",		// Name
-        gapX,									// half x thick
-        gapY,									// half y thick
-        gapZ);								// half z thick
+    G4Box* larGapTp = new G4Box(
+        "larGapTp",		// Name
+        gapX,	        // half x thick
+        gapY,			// half y thick
+        gapZ);			// half z thick
     G4LogicalVolume* larGapTpLogical = new G4LogicalVolume(
         larGapTp, lar, "Gap_Logical");
 
+    G4double firstPlatesCenter = boxZ + 2 * plate2box + plateZ;
     G4double LarGapcenter;
     for (int itunp = 0; itunp < tungPN - 1; itunp++)
     {
+        LarGapcenter 
+            = firstPlatesCenter + plateZ + gapZ + 2 * (plateZ + gapZ) * itunp;
+        G4double plateCenter = firstPlatesCenter + 2 * (plateZ + gapZ) * itunp;
+
         //// Front Plates and Gaps
         new G4PVPlacement(
             0,                  // Rotation matrix
             //Translation vector
-            G4ThreeVector(0, 0,
-                boxZ \
-                + plateZ \
-                + 2 * (plateZ + gapZ) * itunp
-            ),
+            G4ThreeVector(0, 0, plateCenter),
             tungPlateLogical,   // Logical volume
             "tungPlate_Physical",
             fpWorldLogical,
             false,
             0
         );
-
-        LarGapcenter = boxZ + 2 * plateZ + gapZ \
-            + 2 * (plateZ + gapZ) * itunp;
-
         new G4PVPlacement(
             0,										//Rotation matrix
             G4ThreeVector(0, 0, LarGapcenter),		//Translation vector
@@ -592,24 +620,17 @@ void FCalDetectorConstruction::SetupGeometry()
         if (itunp < tungBPN - 1)
         {
             new G4PVPlacement(
-                0,  //Rotation matrix
-                //Translation vector
-                G4ThreeVector(
-                    0, 0,
-                    -(boxZ
-                      + plateZ
-                      + 2 * (plateZ + gapZ) * itunp)
-                ),
-                tungPlateLogical,  //Logical volume
+                0,                                  //Rotation matrix
+                G4ThreeVector(0, 0, -plateCenter),  //Translation vector
+                tungPlateLogical,                   //Logical volume
                 "tungPlate_Physical",
                 fpWorldLogical,
                 false,
                 0
             );
-
             new G4PVPlacement(
-                0,										//Rotation matrix
-                G4ThreeVector(0, 0, -LarGapcenter),		//Translation vector
+                0,									    //Rotation matrix
+                G4ThreeVector(0, 0, -LarGapcenter),	    //Translation vector
                 larGapTpLogical,                        //Logical volume
                 "larGapTp_Physical",
                 fpWorldLogical,
@@ -620,13 +641,13 @@ void FCalDetectorConstruction::SetupGeometry()
     }
 
     //// Last Plate (No LAr Gap) - Front
+    G4double lastFrontPlateCenter 
+        = firstPlatesCenter + 2 * (plateZ + gapZ) * (tungPN - 1);
     new G4PVPlacement(
         0,                  //Rotation matrix
         //Translation vector
-        G4ThreeVector(0, 0,
-            boxZ \
-            + plateZ \
-            + 2 * (plateZ + gapZ) * (tungPN - 1)
+        G4ThreeVector(
+            0, 0, lastFrontPlateCenter
         ),
         tungPlateLogical,   //Logical volume
         "tungPlate_Physical",
@@ -639,10 +660,8 @@ void FCalDetectorConstruction::SetupGeometry()
     new G4PVPlacement(
         0,                  //Rotation matrix
         //Translation vector
-        G4ThreeVector(0, 0,
-            -(boxZ
-              + plateZ
-              + 2 * (plateZ + gapZ) * (tungBPN - 1))
+        G4ThreeVector(
+            0, 0, -(firstPlatesCenter + 2 * (plateZ + gapZ) * (tungBPN - 1))
         ),
         tungPlateLogical,   //Logical volume
         "tungPlate_Physical",
@@ -659,9 +678,8 @@ void FCalDetectorConstruction::SetupGeometry()
     // Position and rotation.
     G4RotationMatrix cryoRotation;
     cryoRotation.rotateX(90 * CLHEP::degree);
-    G4double cryoPosZ = \
-        cryoFrontSepZ
-        + boxZ + 2 * (plateZ + gapZ) * (tungPN - 1) + 2 * plateZ
+    G4double cryoPosZ
+        = cryoFrontSepZ + (lastFrontPlateCenter + plateZ)
         - sqrt(pow(cryoIIRadius, 2) - pow(cryoPosX, 2));
     G4Transform3D cryoTransform = G4Transform3D(
         cryoRotation,
@@ -733,7 +751,7 @@ void FCalDetectorConstruction::SetupGeometry()
 	//// Change color palette here
 	G4VisAttributes* colors[] = {
 		new G4VisAttributes(G4Colour(1.0, 0.2, 0.2, 1.0)),	// Hot Red      1.0
-		new G4VisAttributes(G4Colour(0.0, 0.5, 0.5, 1.0)),	// Argon Green  0.15
+		new G4VisAttributes(G4Colour(0.0, 0.5, 0.5, 0.3)),	// Argon Green  0.15
 		new G4VisAttributes(G4Colour(0.5, 0.5, 0.5, 1.0)),	// Silver       0.3
         new G4VisAttributes(G4Colour(0.4, 0.15, 0.4, 1.0)),	// Tungsten     0.3
         new G4VisAttributes(G4Colour(1.0, 1.0, 1.0, 0.3))	// White Smoke
@@ -754,7 +772,8 @@ void FCalDetectorConstruction::SetupGeometry()
         {cryoInnerWallLogical, colors[2]},
         {cryoMiddleLogical, colors[1]},
         {cryoOuterWallLogical, colors[2]},
-        {PEEKboxLogical, colors[4]}
+        {PEEKboxLogical, colors[4]},
+        {plateBoxGapLogical, colors[1]}
 	};
 	for (const auto& p : colorMap) {
 		p.first->SetVisAttributes(p.second);
