@@ -44,14 +44,19 @@ void FCalPrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent)
 {
     G4double tubtriside = 7.5 * CLHEP::mm;
 
-    // x, y for the "upper right" (+x and +y) tube.
-    G4double offset[2] = { tubtriside / 4 * 3, tubtriside / 4 * sqrt(3) };
+    // Center of the "upper right" (+x and +y) tube.
+    G4ThreeVector offset = G4ThreeVector(
+        tubtriside / 4 * 3, tubtriside / 4 * sqrt(3), 0);
 
-    fParticleGun->SetParticlePosition(G4ThreeVector(
-        offset[0] + G4RandGauss::shoot(0, 0.03) * CLHEP::cm,
-        offset[1] + G4RandGauss::shoot(0, 0.03) * CLHEP::cm,
+    // Sets `offset` to the 0 vector for a centered beam.
+    // offset = G4ThreeVector();  
+
+    G4ThreeVector position = G4ThreeVector(
+        G4RandGauss::shoot(0, 0.03) * CLHEP::cm,
+        G4RandGauss::shoot(0, 0.03) * CLHEP::cm,
         20.0 * CLHEP::cm
-    ));
+    );
 
+    fParticleGun->SetParticlePosition(position + offset);
     fParticleGun->GeneratePrimaryVertex(anEvent);
 }

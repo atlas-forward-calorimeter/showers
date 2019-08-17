@@ -16,22 +16,10 @@ import pandas
 
 from . import calc
 
-_e_lims_200 = (0, 350)  # for 200 GeV
-_e_lims_350 = (0, 700)  # for 350 GeV
-_tube_e_lims_200 = tuple(lim / 15 for lim in _e_lims_200)
-_tube_e_lims_350 = tuple(lim / 15 for lim in _e_lims_350)
-
-# Energy-z histogram limits for the 8 by 4 plate arrangements. The
-# limits for the 7 by 7 and 6 by 6 arrangements are shifted towards
-# -z in increments of length equal to the `_plate_separation`.
-_z_lims = {(8, 4): (-50, 80)}
-_plate_separation = 4 + 3.5
-for i, plates in enumerate(((7, 5), (6, 6)), start=1):
-    _z_lims[plates] = tuple(
-        # Subtract multiples of the `_plate_separation` from the 8 by 4
-        # limits.
-        lim - _plate_separation * i for lim in _z_lims[(8, 4)]
-    )
+_e_lims_200 = (0, 400)  # for 200 GeV
+_e_lims_350 = (0, 650)  # for 350 GeV
+_tube_e_lims_200 = tuple(lim / 25 for lim in _e_lims_200)
+_tube_e_lims_350 = tuple(lim / 25 for lim in _e_lims_350)
 
 # PEEK box z-limits.
 _PEEK_z_lims = (-43.5 / 2, 43.5 / 2)
@@ -178,7 +166,8 @@ class Piece(abc.ABC):
             e_lims = _e_lims_200
             tube_e_lims = _tube_e_lims_200
 
-        z_lims = _z_lims.get(self.info.get('plates')) or _z_lims[(8, 4)]
+        z_lims = calc.z_lims.get(self.info.get('plates')) \
+                 or calc.z_lims[(8, 4)]
 
         return e_lims, tube_e_lims, z_lims
 
@@ -265,8 +254,13 @@ class Event(Piece):
             histogram.add_data(self.treated_hits)
         self.numbers.add_data(self.treated_hits, self.__tags)
 
+        if self.info.get('offset_beam'):
+            e_dep = self.numbers.get()['top_right']
+        else:
+            e_dep = self.numbers.get()['middle_e_dep']
+
         self.hists['energy_vs_z'].plot_single(
-            energy_label=self._energy_label(self.numbers.get()['middle_e_dep'])
+            energy_label=self._energy_label(e_dep)
         )
         self.hists['energy_vs_xy'].plot_single()
 
@@ -297,36 +291,50 @@ class Event(Piece):
         were before the rotation tests), then cuts off any rotated
         data that ends up outside of the PEEK box limits.
         """
+        offset_beam = self.info.get('offset_beam')
         tubes_angle = self.info.get('tubes_angle')
-        if not tubes_angle:
+        if not offset_beam and not tubes_angle:
             return hits
 
         in_PEEK = hits.z.between(*_PEEK_z_lims)
 
         PEEK_hits = hits[in_PEEK].copy()
         plate_hits = hits[~in_PEEK]
-        PEEK_positions = PEEK_hits[['x', 'y', 'z']]
 
-        # Shift so the center of the singled out tube cal is at the
-        # origin.
-        PEEK_positions -= _single_cal_position
+        if tubes_angle:
+            PEEK_positions = PEEK_hits[['x', 'y', 'z']]
 
-        # Reverse the rotation about the y-axis.
-        angle_radians = math.pi / 180 * tubes_angle
-        reverseYrotation = numpy.array([
-            [math.cos(-angle_radians),    0, math.sin(-angle_radians)],
-            [0,                         1, 0                     ],
-            [-math.sin(-angle_radians),   0, math.cos(-angle_radians)]
-        ])
-        PEEK_positions = (reverseYrotation @ PEEK_positions.T).T
+            if offset_beam:
+                # Shift so the center of the singled out tube cal is at the
+                # origin.
+                PEEK_positions -= _single_cal_position
 
-        # Shift the center of the singled out tube cal back to its
-        # original position.
-        PEEK_hits[['x', 'y', 'z']] = PEEK_positions + _single_cal_position
+            # Reverse the rotation about the y-axis.
+            angle_radians = math.pi / 180 * tubes_angle
+            reverseYrotation = numpy.array([
+                [math.cos(-angle_radians),    0, math.sin(-angle_radians)],
+                [0,                         1, 0                     ],
+                [-math.sin(-angle_radians),   0, math.cos(-angle_radians)]
+            ])
+            PEEK_positions = (reverseYrotation @ PEEK_positions.T).T
 
-        # Cut off the `PEEK_hits` that are rotated outside of the PEEK
-        # box range.
-        PEEK_hits = PEEK_hits[PEEK_hits.z.between(*_PEEK_z_lims)]
+            if offset_beam:
+                # Shift the center of the singled out tube cal back to its
+                # original position.
+                PEEK_positions += _single_cal_position
+
+            PEEK_hits[['x', 'y', 'z']] = PEEK_positions
+
+            # Cut off the `PEEK_hits` that were rotated out of the PEEK
+            # box range.
+            PEEK_hits = PEEK_hits[PEEK_hits.z.between(*_PEEK_z_lims)]
+
+        if offset_beam:
+            # Cut out hits that aren't in the top right tube cal.
+            # TODO: Organize the 7.5 / 4 offset!
+            offset = 7.5 / 4
+            PEEK_hits = PEEK_hits[PEEK_hits.y > 0]
+            PEEK_hits = PEEK_hits[PEEK_hits.x > offset]
 
         treated_hits = pandas.concat(
             (PEEK_hits, plate_hits), ignore_index=True
@@ -364,8 +372,11 @@ class Run(Piece):
         )
         self.numbers.save()
 
+        e_dep_key = (
+            'top_right' if self.info.get('offset_beam') else 'middle_e_dep'
+        )
         energy_label = self._energy_label(
-            means['middle_e_dep'], stds['middle_e_dep']
+            means[e_dep_key], stds[e_dep_key]
         )
         self.hists['energy_vs_z'].plot_means(energy_label=energy_label)
         self.hists['energy_vs_z'].plot_multi(energy_label=energy_label)
@@ -463,6 +474,7 @@ def go(out_dir, *run_dirs, info=None):
                 f"\n{e}"
             )
             warnings.warn(msg)
+
     assert runs, "Couldn't successfully analyze any runs!"
 
     if out_dir:
