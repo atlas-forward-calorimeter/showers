@@ -39,7 +39,7 @@ _default_tube_z_lims = (-35 / 2, 35 / 2)
 # tick labels are displayed without decimals.
 _default_middle_z_lims = tuple(int(lim) for lim in (-8 / 2, 8 / 2))
 
-_default_xy_lims = 2 * ((-20 / 2, 20 / 2),)
+_default_xy_lims = 2 * ((-3, 3),)
 _default_xy_hist_z_lims = _default_middle_z_lims
 
 _image_format = 'jpg'
@@ -215,7 +215,6 @@ class Numbers(Calc):
             new_results.update(tags)
 
         new_results.update(self.__split_z(data))
-        new_results.update(self.__tubes(data))
 
         return new_results
 
@@ -244,7 +243,7 @@ class Numbers(Calc):
         return {
             'full_e_dep':
                 data.energy_deposit.sum(),
-            'tubes_e_dep':
+            'tube_e_dep':
                 data.energy_deposit[tube_indices].sum(),
             'middle_e_dep':
                 data.energy_deposit[middle_indices].sum(),

@@ -414,6 +414,7 @@ class Run(Piece):
             else:
                 self.info['incident_energy'] = '200gev'
         if 'plates' not in self.info:
+            # TODO: Parse this with regex.
             if '8-4' in lowercase_name:
                 self.info['plates'] = (8, 4)
             elif '7-5' in lowercase_name:
