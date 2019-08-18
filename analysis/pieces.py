@@ -5,31 +5,32 @@ TODO: Remove titles completely?
 """
 
 import abc
+import math
 import os
+import re
 import textwrap
 import warnings
 
+import numpy
 import pandas
 
 from . import calc
 
-_e_lims_200 = (0, 350)  # for 200 GeV
-_e_lims_350 = (0, 700)  # for 350 GeV
-_tube_e_lims_200 = tuple(lim / 15 for lim in _e_lims_200)
-_tube_e_lims_350 = tuple(lim / 15 for lim in _e_lims_350)
+_e_lims_200 = (0, 400)  # for 200 GeV
+_e_lims_350 = (0, 650)  # for 350 GeV
+_tube_e_lims_200 = tuple(lim / 25 for lim in _e_lims_200)
+_tube_e_lims_350 = tuple(lim / 25 for lim in _e_lims_350)
 
-# Energy-z histogram limits for the 8 by 4 plate arrangements. The
-# limits for the 7 by 7 and 6 by 6 arrangements are shifted towards
-# -z in increments of length equal to the `_plate_separation`.
-_z_lims = {(8, 4): (-50, 80)}
-_plate_separation = 4 + 3.5
-for i, plates in enumerate(((7, 5), (6, 6)), start=1):
-    _z_lims[plates] = tuple(
-        # Subtract multiples of the `_plate_separation` from the 8 by 4
-        # limits.
-        lim - _plate_separation * i for lim in _z_lims[(8, 4)]
-    )
+# PEEK box z-limits.
+_PEEK_z_lims = (-43.5 / 2, 43.5 / 2)
 
+# Position of the center of the "top right" calorimeter.
+_tube_separation = 7.5
+_single_cal_position = numpy.array([
+    3 / 4 * _tube_separation,
+    math.sqrt(3) / 4 * _tube_separation,
+    0
+])
 
 # Filename to use when saving combined `Numbers` results from several
 # runs.
@@ -116,6 +117,10 @@ class Piece(abc.ABC):
         if self.info.get('offset_beam'):
             title += ' Offset $e^-.$'
 
+        tubes_angle = self.info.get('tubes_angle')
+        if tubes_angle:
+            title += f'$ {tubes_angle}\\degree$ rotation.'
+
         incident_energy = self.info.get('incident_energy')
         if incident_energy == '350gev':
             title += ' 350 GeV $e^-.$'
@@ -161,7 +166,8 @@ class Piece(abc.ABC):
             e_lims = _e_lims_200
             tube_e_lims = _tube_e_lims_200
 
-        z_lims = _z_lims.get(self.info.get('plates')) or _z_lims[(8, 4)]
+        z_lims = calc.z_lims.get(self.info.get('plates')) \
+                 or calc.z_lims[(8, 4)]
 
         return e_lims, tube_e_lims, z_lims
 
@@ -199,6 +205,9 @@ class Event(Piece):
     A single event.
 
         Attributes:
+            treated_hits: Hits data with the data in the PEEK box
+             rotated so the tube cals are along the z-axis again.
+
             hits: Data obtained from the hits file path.
 
             energy_vs_z: Energy vs. z histogram object, from calc.
@@ -227,7 +236,7 @@ class Event(Piece):
         """
         super().__init__(hits_path, parent, out_dir, info)
 
-        self.hits = None
+        self.treated_hits = None
 
         # For tagging Numbers entries.
         self.__tags = {'event': self.info['event']}
@@ -238,14 +247,20 @@ class Event(Piece):
 
     def go(self):
         """Read in data, make plots and do calculations."""
-        self.hits = pandas.read_csv(self.input_path, skiprows=_skiprows)
+        hits = pandas.read_csv(self.input_path, skiprows=_skiprows)
+        self.treated_hits = self.__treat_hits(hits)
 
         for histogram in self.hists.values():
-            histogram.add_data(self.hits)
-        self.numbers.add_data(self.hits, self.__tags)
+            histogram.add_data(self.treated_hits)
+        self.numbers.add_data(self.treated_hits, self.__tags)
+
+        if self.info.get('offset_beam'):
+            e_dep = self.numbers.get()['top_right']
+        else:
+            e_dep = self.numbers.get()['middle_e_dep']
 
         self.hists['energy_vs_z'].plot_single(
-            energy_label=self._energy_label(self.numbers.get()['middle_e_dep'])
+            energy_label=self._energy_label(e_dep)
         )
         self.hists['energy_vs_xy'].plot_single()
 
@@ -266,6 +281,66 @@ class Event(Piece):
 
     def _input_path2name(self, input_path):
         return _file2name(input_path)
+
+    def __treat_hits(self, hits):
+        """Rotate the positions of the `hits` within the PEEK box in
+        order to reverse the rotation of the tube calorimeters.
+
+        Rotates the PEEK hit positions about the center of the singled
+        out tube until the tubes are aligned with the z-axis (as they
+        were before the rotation tests), then cuts off any rotated
+        data that ends up outside of the PEEK box limits.
+        """
+        offset_beam = self.info.get('offset_beam')
+        tubes_angle = self.info.get('tubes_angle')
+        if not offset_beam and not tubes_angle:
+            return hits
+
+        in_PEEK = hits.z.between(*_PEEK_z_lims)
+
+        PEEK_hits = hits[in_PEEK].copy()
+        plate_hits = hits[~in_PEEK]
+
+        if tubes_angle:
+            PEEK_positions = PEEK_hits[['x', 'y', 'z']]
+
+            if offset_beam:
+                # Shift so the center of the singled out tube cal is at the
+                # origin.
+                PEEK_positions -= _single_cal_position
+
+            # Reverse the rotation about the y-axis.
+            angle_radians = math.pi / 180 * tubes_angle
+            reverseYrotation = numpy.array([
+                [math.cos(-angle_radians),    0, math.sin(-angle_radians)],
+                [0,                         1, 0                     ],
+                [-math.sin(-angle_radians),   0, math.cos(-angle_radians)]
+            ])
+            PEEK_positions = (reverseYrotation @ PEEK_positions.T).T
+
+            if offset_beam:
+                # Shift the center of the singled out tube cal back to its
+                # original position.
+                PEEK_positions += _single_cal_position
+
+            PEEK_hits[['x', 'y', 'z']] = PEEK_positions
+
+            # Cut off the `PEEK_hits` that were rotated out of the PEEK
+            # box range.
+            PEEK_hits = PEEK_hits[PEEK_hits.z.between(*_PEEK_z_lims)]
+
+        if offset_beam:
+            # Cut out hits that aren't in the top right tube cal.
+            # TODO: Organize the 7.5 / 4 offset!
+            offset = 7.5 / 4
+            PEEK_hits = PEEK_hits[PEEK_hits.y > 0]
+            PEEK_hits = PEEK_hits[PEEK_hits.x > offset]
+
+        treated_hits = pandas.concat(
+            (PEEK_hits, plate_hits), ignore_index=True
+        )
+
+        return treated_hits
 
 
 class Run(Piece):
@@ -297,8 +372,11 @@ class Run(Piece):
         )
         self.numbers.save()
 
+        e_dep_key = (
+            'top_right' if self.info.get('offset_beam') else 'middle_e_dep'
+        )
         energy_label = self._energy_label(
-            means['middle_e_dep'], stds['middle_e_dep']
+            means[e_dep_key], stds[e_dep_key]
         )
         self.hists['energy_vs_z'].plot_means(energy_label=energy_label)
         self.hists['energy_vs_z'].plot_multi(energy_label=energy_label)
@@ -350,6 +428,19 @@ class Run(Piece):
             self.info['offset_beam'] = (
                 True if 'offset' in lowercase_name else False
             )
+        # Rotation angle of the tube cals about the y-axis.
+        if 'tubes_angle' not in self.info:
+            angle_strings = re.findall(r'm?[0-9]+deg', lowercase_name)
+            if angle_strings:
+                angle_string = angle_strings[0]
+
+                tubes_angle = float(re.findall(r'[0-9]+', angle_string)[0])
+                if tubes_angle.is_integer():
+                    tubes_angle = int(tubes_angle)
+                if angle_string.startswith('m'):
+                    tubes_angle *= -1
+
+                self.info['tubes_angle'] = tubes_angle
 
     def _check_input_path(self, input_path):
         assert os.path.isdir(input_path), (
@@ -361,7 +452,7 @@ class Run(Piece):
         return _dir2name(input_path)
 
 
-def go(out_dir, *run_dirs):
+def go(out_dir, *run_dirs, info=None):
     """
     Analyze a bunch of runs and output their results in an organized
     folder.
@@ -373,15 +464,17 @@ def go(out_dir, *run_dirs):
     :return:
     :rtype:
     """
-    if len(run_dirs) == 1:
-        return [Run(run_dirs[0], out_dir)]
-
     runs = []
     for run_dir in run_dirs:
         try:
-            runs.append(Run(events_path=run_dir, out_dir=out_dir))
-        except:
-            warnings.warn(f"Couldn't analyze the directory ' {run_dir}.")
+            runs.append(Run(events_path=run_dir, out_dir=out_dir, info=info))
+        except Exception as e:
+            msg = (
+                f"Couldn't analyze the directory ' {run_dir}."
+                f"\n{e}"
+            )
+            warnings.warn(msg)
+
     assert runs, "Couldn't successfully analyze any runs!"
 
     if out_dir:

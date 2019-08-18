@@ -16,12 +16,23 @@ from matplotlib import pyplot
 # Use seaborn's plotting styles.
 seaborn.set()
 
+# Energy-z histogram limits for the 8 by 4 plate arrangements. The
+# limits for the 7 by 7 and 6 by 6 arrangements are shifted towards
+# -z in increments of length equal to the `_plate_separation`.
+z_lims = {(8, 4): (-65, 95)}
+_plate_separation = 4 + 3.5
+for i, plates in enumerate(((7, 5), (6, 6)), start=1):
+    z_lims[plates] = tuple(
+        # Subtract multiples of the `_plate_separation` from the 8 by 4
+        # limits.
+        lim - _plate_separation * i for lim in z_lims[(8, 4)]
+    )
+
 _default_bin_density = 10
 _default_dpi = 300
 _default_length_units = 'mm'
 _default_energy_units = 'MeV'
 
-_default_z_lims = (-50, 80)
 _default_tube_z_lims = (-35 / 2, 35 / 2)
 
 # Convert the _default_middle_z_lims to integers so that the plot
@@ -414,7 +425,7 @@ class EnergyVsZ(Histogram):
         self.__tube_e_lims = tube_e_lims
 
         # Attributes with defaults.
-        self.__z_lims = z_lims or _default_z_lims
+        self.__z_lims = z_lims or z_lims[(8, 4)]
         self.__tube_z_lims = tube_z_lims or _default_tube_z_lims
         self.__middle_z_lims = middle_z_lims or _default_middle_z_lims
 
@@ -613,7 +624,6 @@ class EnergyVsZ(Histogram):
         )
         return plots, plots_middle
 
-
     def __label_middle(self, ax, energy_label):
         """Label the energy deposit in the middle tube sections."""
         if energy_label:
@@ -780,63 +790,6 @@ def save_dataframe(dataframe, path):
     dataframe.to_excel(excel_path, index=False)
 
     return csv_path, excel_path
-
-
-def _split_plot(
-        x,
-        ys,
-        split_lims,
-        ax1_plot_func,
-        ax2_plot_func,
-        kwargs1=None,
-        kwargs2=None
-):
-    """
-    Split up data and plot it on two axes.
-
-    The data with x values inside split_lims (inclusive) goes on ax1,
-    and the rest goes on ax2.
-
-    :param x: x values.
-    :type x: 1d array
-    :param ys: All the y values.
-    :type ys: 2d array
-    :param split_lims: Split data based on x values within or outside of
-        these limits.
-    :type split_lims: (float, float)
-    :param ax1_plot_func: Data inside split_lims (inclusive) is plotted
-        by calling this.
-    :type ax1_plot_func: function
-    :param ax2_plot_func: Data outside split_lims is plotted by calling
-        this.
-    :type ax2_plot_func: function
-    :param kwargs1: Keyword arguments passed to the ax1 plot.
-    :type kwargs1: dict or None
-    :param kwargs2: Keyword arguments passed to the ax2 plot.
-    :type kwargs2: dict or None
-    :return: The two plot results.
-    :rtype: (handle, handle)
-    """
-    if kwargs1 is None:
-        kwargs1 = {}
-    if kwargs2 is None:
-        kwargs2 = {}
-
-    inside_indices = _range2indices(x, split_lims)
-    outside_indices = numpy.logical_not(inside_indices)
-
-    plots1 = ax1_plot_func(
-        x[inside_indices],
-        *(y[inside_indices] for y in ys),
-        **kwargs1
-    )
-    plots2 = ax2_plot_func(
-        x[outside_indices],
-        *(y[outside_indices] for y in ys),
-        **kwargs2
-    )
-
-    return plots1, plots2
 
 
 def _range2indices(array, range_lims):
