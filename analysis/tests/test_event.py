@@ -15,15 +15,14 @@ class TestEvent(unittest.TestCase):
         # Create and analyze a test event.
         self.event = Event(
             os.path.join(context.testsDir, 'data', 'run1', 'hits-0.csv'),
-            outDirectory=False
-        )
+            out_dir=False)
         self.event.go()
     
     def test_total_energy_deposit(self):
-        self.assertAlmostEqual(self.event.fullEdep, 6175.80174032489)
+        self.assertAlmostEqual(self.event.e_dep, 6175.80174032489)
     
     def test_middle_tube_energy_deposit(self):
-        self.assertAlmostEqual(self.event.middleEdep, 72.950128318868)
+        self.assertAlmostEqual(self.event.middle_e_dep, 72.950128318868)
     
     def test_energy_z_histogram(self):
         testSums = np.loadtxt(

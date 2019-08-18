@@ -277,8 +277,8 @@ void FCalDetectorConstruction::SetupGeometry()
 
     for (int it = 0; it < numCals; it++)
     {
-        tshifty[it] = -tubtriside / 4 * sqrt(3.) * pow(-1, it);
         tshiftx[it] = tubtriside / 4 * (it * 2 - 3);
+        tshifty[it] = -tubtriside / 4 * sqrt(3.) * pow(-1, it);
         tshiftz[it] = 0;
         Trh[it] = G4Transform3D(
             Rth, G4ThreeVector(tshiftx[it], tshifty[it], tshiftz[it]));
@@ -504,124 +504,7 @@ void FCalDetectorConstruction::SetupGeometry()
             Ro, G4ThreeVector(tshiftx[it], tshifty[it], tshiftz[it]));
         assemblyTube->MakeImprint(fpWorldLogical, Tr0);
     }
-/*
-    ///|////////////////////////////////////////////////////////////////////
-	//|| Tungsten Plate Series
-    ///|////////////////////////////////////////////////////////////////////
-	G4Box* tungPlate = new G4Box("tungPlate",	// Name
-		plateX,									// half x thick
-		plateY,									// half y thick
-		tunghzTot / (double)tungPN);			// half z thick
-	G4LogicalVolume* tungPlateLogical = new G4LogicalVolume(
-		tungPlate, tungsten, "tungPlate_Logical");
 
-	G4Box* larGapTp = new G4Box("larGapTp",		// Name
-		boxX,									// half x thick
-		boxY,									// half y thick
-		larGThz);								// half z thick
-	G4LogicalVolume* larGapTpLogical = new G4LogicalVolume(
-		larGapTp, lar, "Gap_Logical");
-
-	G4double LarGapcenter;
-	for (int itunp = 0; itunp < tungPN - 1; itunp++)
-	{
-		//// Front
-		new G4PVPlacement(
-			0,                  // Rotation matrix
-			//Translation vector
-			G4ThreeVector(0, 0, 
-				boxZ \
-				+ tunghzTot / tungPN \
-				+ (tunghzTot / tungPN + larGThz) * 2 * itunp
-			),
-			tungPlateLogical,   // Logical volume
-			"tungPlate_Physical",
-			fpWorldLogical,
-			false,
-			0
-		);
-
-		LarGapcenter = boxZ + tunghzTot / tungPN * 2 + larGThz \
-			+ (tunghzTot / tungPN + larGThz) * 2 * itunp;
-
-		new G4PVPlacement(
-			0,										//Rotation matrix
-			G4ThreeVector(0, 0, LarGapcenter),		//Translation vector
-			larGapTpLogical,						//Logical volume
-			"larGapTp_Physical",
-			fpWorldLogical,
-			false,
-			0
-		);
-
-		//// Back
-		if (itunp < tungBPN - 1)
-		{
-			new G4PVPlacement(
-				0,  //Rotation matrix
-				//Translation vector
-				G4ThreeVector(
-					0, 0, 
-					-(
-						boxZ
-						+ tunghzTot / tungPN
-						+ (tunghzTot / tungPN + larGThz) * 2 * itunp
-					)
-				),
-				tungPlateLogical,  //Logical volume
-				"tungPlate_Physical",
-				fpWorldLogical,
-				false,
-				0
-			);
-
-			new G4PVPlacement(
-				0,										//Rotation matrix
-				G4ThreeVector(0, 0, -LarGapcenter),		//Translation vector
-				larGapTpLogical,                        //Logical volume
-				"larGapTp_Physical",
-				fpWorldLogical,
-				false,
-				0
-			);
-		}
-	}
-
-	//// Last Piece - Front
-	new G4PVPlacement(
-		0,                  //Rotation matrix
-		//Translation vector
-		G4ThreeVector(0, 0, 
-			boxZ \
-			+ tunghzTot / tungPN \
-			+ (tunghzTot / tungPN + larGThz) * 2 * (tungPN - 1)
-		),
-		tungPlateLogical,   //Logical volume
-		"tungPlate_Physical",
-		fpWorldLogical,
-		false,
-		0
-	);
-
-	//// Last Piece - Back
-	new G4PVPlacement(
-		0,                  //Rotation matrix
-		//Translation vector
-		G4ThreeVector(0, 0, 
-			-(
-				boxZ
-				+ tunghzTot / tungPN
-				+ (tunghzTot / tungPN + larGThz) * 2 * (tungBPN - 1)
-			)
-		),
-		tungPlateLogical,   //Logical volume
-		"tungPlate_Physical",
-		fpWorldLogical,
-		false,
-		0
-	);
-    ///| End of Tungsten Plate Series //////////////////////////////////////
-*/
     ///|////////////////////////////////////////////////////////////////////
     //|| Tungsten Plate Series
     ///|////////////////////////////////////////////////////////////////////
