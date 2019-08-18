@@ -199,11 +199,6 @@ void FCalDetectorConstruction::SetupGeometry()
     G4double tubeLeftRightZ = 13.5 / 2 * CLHEP::mm;
     G4double tubeGap = 0.025 * CLHEP::mm;  // gap between tube parts
 
-    //// Tube Placement
-    const int numCals = 4;  // # of complete calorimeter tubes
-    double tubtriside = 7.5 * CLHEP::mm;
-    double tubHoleRadius = (tubeOuterRadius + 0.0025) * CLHEP::mm;
-
     //// Shaft
     G4double shaftRadius = 3 / 2 * CLHEP::mm;
 
@@ -214,12 +209,16 @@ void FCalDetectorConstruction::SetupGeometry()
 
     //// PEEK Box
 
+    // Small gap between the outer tube and the hole in the PEEK box which
+    // houses it.
+    G4double tubeHoleGap = 0.0025 * CLHEP::mm;
+
     // Rotate the tube cals and the cavities in the PEEK box that house them
     // about the y-axis through an angle `tubesAngle`.
     G4double tubesAngle = -0 * CLHEP::degree;
 
     // Extra width to enclose rotated tubes.
-    G4double boxX = (40 / 2 + 8) * CLHEP::mm;
+    G4double boxX = 40 / 2 * CLHEP::mm;
 
     G4double boxY = 40 / 2 * CLHEP::mm;
     G4double boxZ = 43.5 / 2 * CLHEP::mm;
@@ -454,68 +453,28 @@ void FCalDetectorConstruction::SetupGeometry()
     assemblyTube->AddPlacedVolume(
         tubeRLogical, Tr0);
 
-    //|| Four Tubes ////////////////////////////////////////////////////////
-
-    //// The shifts of the tube cals relative to their center.
-    G4Transform3D tubeShifts[numCals];
-    for (int i = 0; i < numCals; i++)
-    {
-        tubeShifts[i] = G4Transform3D(G4RotationMatrix(), G4ThreeVector(
-            tubtriside / 4 * (2 * i - 3),
-            -tubtriside / 4 * sqrt(3.) * pow(-1, i),
-            0
-        ));
-    }
-
-    //// Shifts relative to the center of the top right tube.
-    G4Transform3D relativeTubeShifts[numCals];
-    for (int i = 0; i < numCals; i++) {
-        relativeTubeShifts[i] = G4Transform3D(
-            G4RotationMatrix(),
-            tubeShifts[i].getTranslation() - tubeShifts[3].getTranslation()
-        );
-    }
-
-    G4AssemblyVolume* assembly4tubes = new G4AssemblyVolume();
-    for (auto relTubeShift : relativeTubeShifts)
-        // Placed such that the origin is at the "upper right" (+x and +y)
-        // tube cal.
-        assembly4tubes->AddPlacedAssembly(assemblyTube, relTubeShift);
-
     ///|////////////////////////////////////////////////////////////////////
     //|| PEEK Box
     ///|////////////////////////////////////////////////////////////////////
 
-    // Rotation of the tube cals and their shift relative to their origin in
-    // the "upper right" tube.
+    // Rotation of the tube cal.
     G4RotationMatrix tubesRotation = G4RotationMatrix();
     tubesRotation.rotateY(tubesAngle);
     G4Transform3D tubesTransform = G4Transform3D(
-        tubesRotation, tubeShifts[3].getTranslation()
+        tubesRotation, G4ThreeVector()
     );
 
-    // Cylindrical cavities in the box which house the tubes.
+    // Cylindrical cavity in the box which houses the tubes.
     G4Tubs* tubHole = new G4Tubs(
-        "TubHole",			        // Name
-        0,					        // Inner radius
-        tubHoleRadius,		        // Outer radius
-
-        // This length ensures that the hole solid is longer than all dimensions 
-        // of the PEEK box.
-        2 * (boxX + boxY + boxZ),	// Half length in z
-
-        0,					        // Starting phi angle
-        360					        // Segment angle	
+        "TubHole",			            // Name
+        0,					            // Inner radius
+        tubeOuterRadius + tubeHoleGap,  // Outer radius
+        // This half-length ensures that the hole solid is longer than all
+        // dimensions of the PEEK box.
+        2 * (boxX + boxY + boxZ),
+        0,					            // Starting phi angle
+        360					            // Segment angle	
     );
-    //////////////////////////////////////////// TODO: Make this logic prettier.
-    // Placed such that the origin is at the "upper right" (+x and +y)
-    // tube cal.
-    G4UnionSolid* fhs = new G4UnionSolid(
-        "Union", tubHole, tubHole, relativeTubeShifts[0]);
-    fhs = new G4UnionSolid(
-        "Union", fhs, tubHole, relativeTubeShifts[1]);
-    fhs = new G4UnionSolid(
-        "FourHoles", fhs, tubHole, relativeTubeShifts[2]);
 
     G4Box* holelessPEEKbox = new G4Box(
         "HolelessPEEKBox",    // Name
@@ -524,14 +483,14 @@ void FCalDetectorConstruction::SetupGeometry()
         boxZ				    // half z thick
     );
     G4SubtractionSolid* PEEKbox = new G4SubtractionSolid(
-        "PEEKBox", holelessPEEKbox, fhs, tubesTransform);
+        "PEEKBox", holelessPEEKbox, tubHole, tubesTransform);
     G4LogicalVolume* PEEKboxLogical = new G4LogicalVolume(
         PEEKbox,    // Solid
         PEEK,	    // Material
         "PEEKBox_Logical"
     );
 
-    //|| Assemble and Place PEEK Box and Tube Cals /////////////////////////
+    //|| Assemble and Place PEEK Box and Tube Cal /////////////////////////
     G4Transform3D identityTransform = G4Transform3D();
     G4RotationMatrix identityRotation = G4RotationMatrix();
 
@@ -541,7 +500,7 @@ void FCalDetectorConstruction::SetupGeometry()
 
     // Place the PEEK box and tubes in the assembly box.
     assemblyBox->AddPlacedVolume(PEEKboxLogical, identityTransform);
-    assemblyBox->AddPlacedAssembly(assembly4tubes, tubesTransform);
+    assemblyBox->AddPlacedAssembly(assemblyTube, tubesTransform);
 
     // Place the assembly box in the world.
     assemblyBox->MakeImprint(fpWorldLogical, identityTransform);
@@ -728,7 +687,7 @@ void FCalDetectorConstruction::SetupGeometry()
 
     //// Cryostat Outer Wall
     G4Tubs* cryoOuterWallSolid = new G4Tubs(
-        "CryoOuterWall",                  // Name
+        "CryoOuterWall",                    // Name
         cryoOORadius - cryoOuterThickness,	// Inner radius
         cryoOORadius,	                    // Outer radius
         cryoHalfLength,                     // Half length
