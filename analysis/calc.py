@@ -785,6 +785,7 @@ class EnergyVsXY(Histogram):
 
     def _make_fig_and_axes(self):
         fig, ax = pyplot.subplots()
+        fig.tight_layout(rect=(0, 0, 1, 0.86))
 
         ax.set_xlabel(f'x ({self.length_units})')
         ax.set_ylabel(f'y ({self.length_units})')
