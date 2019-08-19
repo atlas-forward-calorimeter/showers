@@ -9,17 +9,13 @@ import math
 import os
 import re
 import textwrap
+import traceback
 import warnings
 
 import numpy
 import pandas
 
 from . import calc
-
-_e_lims_200 = (0, 400)  # for 200 GeV
-_e_lims_350 = (0, 650)  # for 350 GeV
-_tube_e_lims_200 = tuple(lim / 25 for lim in _e_lims_200)
-_tube_e_lims_350 = tuple(lim / 25 for lim in _e_lims_350)
 
 # PEEK box z-limits.
 _PEEK_z_lims = (-43.5 / 2, 43.5 / 2)
@@ -54,7 +50,7 @@ class Piece(abc.ABC):
             title_width: Wrap plot titles to fit this many characters.
     """
 
-    title_width = 34
+    title_width = 60
 
     def __init__(self, input_path, parent=None, out_dir=None, info=None):
         """
@@ -96,11 +92,8 @@ class Piece(abc.ABC):
 
         self.hists = {}
 
-        e_lims, tube_e_lims, z_lims = self.__get_e_z_lims()
         z_title, xy_title = self._get_titles()
-        self.hists['energy_vs_z'] = calc.EnergyVsZ(
-            self, e_lims, tube_e_lims, z_title, z_lims=z_lims
-        )
+        self.hists['energy_vs_z'] = calc.EnergyVsZ(self, z_title)
         self.hists['energy_vs_xy'] = calc.EnergyVsXY(self, xy_title)
 
         self.numbers = calc.Numbers(self)
@@ -140,36 +133,15 @@ class Piece(abc.ABC):
             '\n'.join(textwrap.wrap(
                 title.format(description), width=self.title_width
             ))
-            for description in ('', ' Middle tubes.')
+            for description in ('', ' Middle section.')
         )
 
-        return title.format(''), title.format(' Middle tubes.')
+        return z_title, xy_title
 
     def _update_info(self):
         """Update this Piece's info (with access to all the defaults
         that are set in __init__). Implemented in the concrete Pieces.
         """
-
-    def __get_e_z_lims(self):
-        """
-        Get the energy-z plot limits for both sets of axes (full and
-        tubes) from Piece info.
-
-        :param info: The Piece info.
-        :return: Energy plot limits.
-        """
-        if ('incident_energy' not in self.info) \
-                or (self.info['incident_energy'] == '350gev'):
-            e_lims = _e_lims_350
-            tube_e_lims = _tube_e_lims_350
-        else:
-            e_lims = _e_lims_200
-            tube_e_lims = _tube_e_lims_200
-
-        z_lims = calc.z_lims.get(self.info.get('plates')) \
-                 or calc.z_lims[(8, 4)]
-
-        return e_lims, tube_e_lims, z_lims
 
     @staticmethod
     def _energy_label(e_dep, std=None):
@@ -346,6 +318,9 @@ class Event(Piece):
 class Run(Piece):
     """A collection of events with a given setup."""
 
+    # For "backwards compatibility" with the old data folder names.
+    __old_plate_names = {'8-4': (8, 4), '7-5': (7, 5), '6-6': (6, 6)}
+
     def __init__(self, events_path, out_dir=None, info=None):
         """
 
@@ -406,7 +381,12 @@ class Run(Piece):
                 yield os.path.join(root, filename)
 
     def _update_info(self):
-        """Parse the folder name and update the Run's info."""
+        """
+        Parse the folder name and update the Run's info.
+
+        If any of 8-4', '7-5', and '6-6' are in the filename, the first
+        one of these, in this order, is taken as the plate arrangement.
+        """
         lowercase_name = self.name.lower()
         if 'incident_energy' not in self.info:
             if '350gev' in lowercase_name:
@@ -414,13 +394,20 @@ class Run(Piece):
             else:
                 self.info['incident_energy'] = '200gev'
         if 'plates' not in self.info:
-            # TODO: Parse this with regex.
-            if '8-4' in lowercase_name:
-                self.info['plates'] = (8, 4)
-            elif '7-5' in lowercase_name:
-                self.info['plates'] = (7, 5)
-            elif '6-6' in lowercase_name:
-                self.info['plates'] = (6, 6)
+            # TODO: Double check this (quickly).
+            plates_strings = re.findall(r'[0-9]+by[0-9]+', lowercase_name)
+            assert len(plates_strings) < 2, \
+                "Matched two or more plate arrangements."
+            if plates_strings:
+                plate_string = plates_strings[0]
+                self.info['plates'] = tuple(
+                    int(plate) for plate in plate_string.split('by')
+                )
+            else:
+                for string, plates in self.__old_plate_names.items():
+                    if string in lowercase_name:
+                        self.info['plates'] = plates
+                        break
         if 'no_cryo' not in self.info:
             self.info['no_cryo'] = (
                 True if 'nocryo' in lowercase_name else False
@@ -453,13 +440,13 @@ class Run(Piece):
         return _dir2name(input_path)
 
 
-def go(out_dir, *run_dirs, info=None):
+def go(run_out_dir, *run_dirs, info=None):
     """
     Analyze a bunch of runs and output their results in an organized
     folder.
 
-    :param out_dir: Where to save all the results, if at all.
-    :type out_dir: str
+    :param run_out_dir: Where to save all the results, if at all.
+    :type run_out_dir: str
     :param run_dirs: Locations of the run data directories.
     :type run_dirs: [str]
     :return:
@@ -468,24 +455,27 @@ def go(out_dir, *run_dirs, info=None):
     runs = []
     for run_dir in run_dirs:
         try:
-            runs.append(Run(events_path=run_dir, out_dir=out_dir, info=info))
+            run_out_dir = os.path.join(run_out_dir, _dir2name(run_dir))
+            runs.append(Run(
+                events_path=run_dir, out_dir=run_out_dir, info=info
+            ))
         except Exception as e:
-            msg = (
-                f"Couldn't analyze the directory ' {run_dir}."
-                f"\n{e}"
-            )
+            msg = f"Couldn't analyze the directory {run_dir}."
             warnings.warn(msg)
+            print("Traceback (most recent call last):")
+            traceback.print_tb(e.__traceback__)
+            print(e)
 
     assert runs, "Couldn't successfully analyze any runs!"
 
-    if out_dir:
-        calc.save_dataframe(
-            dataframe=pandas.concat(
-                (run.numbers.resultss for run in runs),
-                ignore_index=True
-            ),
-            path=os.path.join(out_dir, _numbers_filename)
-        )
+    # if out_dir:
+    #     calc.save_dataframe(
+    #         dataframe=pandas.concat(
+    #             (run.numbers.resultss for run in runs),
+    #             ignore_index=True
+    #         ),
+    #         path=os.path.join(out_dir, _numbers_filename)
+    #     )
 
     return runs
 
