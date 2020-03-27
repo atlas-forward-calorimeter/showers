@@ -2,6 +2,11 @@
 
 TODO: Consider switching to a 16x9 aspect ratio.
 TODO: Remove titles completely?
+
+Changelog:
+    append_mean_and_uncertainties
+    combine_results
+    turned off histograms
 """
 
 import abc
@@ -86,7 +91,7 @@ class Piece(abc.ABC):
             # Inherit things from the parent.
             if self.parent.info:
                 _weak_update(self.info, self.parent.info)
-            if not self.out_dir:
+            if self.out_dir is None:
                 self.out_dir = self.parent.out_subdir
 
         if self.out_dir:
@@ -215,7 +220,7 @@ class Event(Piece):
         :param parent: The parent run that this event belongs to.
         :type parent: Run or None
         :param out_dir: Path to output directory.
-        :type out_dir: str or None
+        :type out_dir: str or False or None
         :param out_text: Path to output text. Defaults to
             out_dir/analysis.txt.
         :type out_text: str or None
@@ -238,8 +243,8 @@ class Event(Piece):
         hits = pandas.read_csv(self.input_path, skiprows=_skiprows)
         self.treated_hits = self.__treat_hits(hits)
 
-        for histogram in self.hists.values():
-            histogram.add_data(self.treated_hits)
+        # for histogram in self.hists.values():
+        #     histogram.add_data(self.treated_hits)
         self.numbers.add_data(self.treated_hits, self.__tags)
 
         if self.info.get('offset_beam'):
@@ -247,10 +252,10 @@ class Event(Piece):
         else:
             e_dep = self.numbers.get()['middle_e_dep']
 
-        self.hists['energy_vs_z'].plot_single(
-            energy_label=self._energy_label(e_dep)
-        )
-        self.hists['energy_vs_xy'].plot_single()
+        # self.hists['energy_vs_z'].plot_single(
+        #     energy_label=self._energy_label(e_dep)
+        # )
+        # self.hists['energy_vs_xy'].plot_single()
 
     def _update_info(self):
         event_number = int(self.name.split('-')[-1])
@@ -364,9 +369,10 @@ class Run(Piece):
         """Create new analyzed Events and analyze this Run."""
         self._new_events()
 
-        means, stds = self.numbers.append_mean_and_dev(
+        means, stds, sems = self.numbers.append_mean_and_uncertainties(
             mean_tags={'run': self.name, 'event': 'mean'},
-            std_tags={'run': self.name, 'event': 'std_dev'}
+            std_tags={'run': self.name, 'event': 'std_dev'},
+            sem_tags={'run': self.name, 'event': 'std_err'}
         )
         self.numbers.save()
 
@@ -376,9 +382,9 @@ class Run(Piece):
         energy_label = self._energy_label(
             means[e_dep_key], stds[e_dep_key]
         )
-        self.hists['energy_vs_z'].plot_means(energy_label=energy_label)
-        self.hists['energy_vs_z'].plot_multi(energy_label=energy_label)
-        self.hists['energy_vs_xy'].plot_means()
+        # self.hists['energy_vs_z'].plot_means(energy_label=energy_label)
+        # self.hists['energy_vs_z'].plot_multi(energy_label=energy_label)
+        # self.hists['energy_vs_xy'].plot_means()
 
         # Print out that we're done.
         print(f'Run {self.name} is finished!')
@@ -389,10 +395,10 @@ class Run(Piece):
         results.
         """
         for hits_path in self._event_paths():
-            event = Event(hits_path, parent=self)
+            event = Event(hits_path, parent=self, out_dir=False)
 
-            for hist_name, hist in event.hists.items():
-                self.hists[hist_name].add_results(hist.get())
+            # for hist_name, hist in event.hists.items():
+            #     self.hists[hist_name].add_results(hist.get())
 
             self.numbers.add_results(event.numbers.get())
 
@@ -404,58 +410,8 @@ class Run(Piece):
                 yield os.path.join(root, filename)
 
     def _update_info(self):
-        """
-        Parse the folder name and update the Run's info.
-
-        If any of 8-4', '7-5', and '6-6' are in the filename, the first
-        one of these, in this order, is taken as the plate arrangement.
-        """
-        lowercase_name = self.name.lower()
-        if 'incident_energy' not in self.info:
-            if '350gev' in lowercase_name:
-                self.info['incident_energy'] = '350gev'
-            else:
-                self.info['incident_energy'] = '200gev'
-        if 'plates' not in self.info:
-            # TODO: Double check this (quickly).
-            plates_strings = re.findall(r'[0-9]+by[0-9]+', lowercase_name)
-            assert len(plates_strings) < 2, \
-                "Matched two or more plate arrangements."
-            if plates_strings:
-                plate_string = plates_strings[0]
-                self.info['plates'] = tuple(
-                    int(plate) for plate in plate_string.split('by')
-                )
-            else:
-                for string, plates in self.__old_plate_names.items():
-                    if string in lowercase_name:
-                        self.info['plates'] = plates
-                        break
-        if 'no_cryo' not in self.info:
-            self.info['no_cryo'] = (
-                True if 'nocryo' in lowercase_name else False
-            )
-        if 'offset_beam' not in self.info:
-            self.info['offset_beam'] = (
-                True if 'offset' in lowercase_name else False
-            )
-        # Rotation angle of the tube cals about the y-axis.
-        if 'tubes_angle' not in self.info:
-            angle_strings = re.findall(_num_pattern + 'deg', lowercase_name)
-            if angle_strings:
-                self.info['tubes_angle'] = _parse_number(angle_strings[0])
-        if 'tube_shift' not in self.info:
-            tube_shift_strings = re.findall(
-                'tube-?' + _num_pattern + 'mm', lowercase_name
-            )
-            if tube_shift_strings:
-                self.info['tube_shift'] = _parse_number(tube_shift_strings[0])
-        if 'beam_shift' not in self.info:
-            beam_shift_strings = re.findall(
-                r'beam-?' + _num_pattern + 'mm', lowercase_name
-            )
-            if beam_shift_strings:
-                self.info['beam_shift'] = _parse_number(beam_shift_strings[0])
+        # TODO: Test that this still works.
+        self.name2info(self.name, self.info)
 
     def _check_input_path(self, input_path):
         assert os.path.isdir(input_path), (
@@ -465,6 +421,64 @@ class Run(Piece):
 
     def _input_path2name(self, input_path):
         return _dir2name(input_path)
+
+    @staticmethod
+    def name2info(name, info=None):
+        """
+        Parse the folder `name` and create or update the `info`
+        dictionary (without replacing existing entries in `info`).
+
+        If any of 8-4', '7-5', and '6-6' are in the filename, the first
+        one of these, in this order, is taken as the plate arrangement.
+        """
+        if info is None:
+            info = {}
+        lowercase_name = name.lower()
+
+        if 'incident_energy' not in info:
+            if '350gev' in lowercase_name:
+                info['incident_energy'] = '350gev'
+            else:
+                info['incident_energy'] = '200gev'
+        if 'plates' not in info:
+            # TODO: Double check this (quickly).
+            plates_strings = re.findall(r'[0-9]+by[0-9]+', lowercase_name)
+            assert len(plates_strings) < 2, \
+                "Matched two or more plate arrangements."
+
+            if plates_strings:
+                plate_string = plates_strings[0]
+                info['plates'] = tuple(
+                    int(plate) for plate in plate_string.split('by')
+                )
+            else:
+                for string, plates in Run.__old_plate_names.items():
+                    if string in lowercase_name:
+                        info['plates'] = plates
+                        break
+        if 'no_cryo' not in info and 'nocryo' in lowercase_name:
+            info['no_cryo'] = True
+        if 'offset_beam' not in info and 'offset' in lowercase_name:
+            info['offset_beam'] = True
+        # Rotation angle of the tube cals about the y-axis.
+        if 'tubes_angle' not in info:
+            angle_strings = re.findall(_num_pattern + 'deg', lowercase_name)
+            if angle_strings:
+                info['tubes_angle'] = _parse_number(angle_strings[0])
+        if 'tube_shift' not in info:
+            tube_shift_strings = re.findall(
+                'tube-?' + _num_pattern + 'mm', lowercase_name
+            )
+            if tube_shift_strings:
+                info['tube_shift'] = _parse_number(tube_shift_strings[0])
+        if 'beam_shift' not in info:
+            beam_shift_strings = re.findall(
+                r'beam-?' + _num_pattern + 'mm', lowercase_name
+            )
+            if beam_shift_strings:
+                info['beam_shift'] = _parse_number(beam_shift_strings[0])
+
+        return info
 
 
 def go(out_dir, *run_dirs, info=None):
@@ -505,6 +519,72 @@ def go(out_dir, *run_dirs, info=None):
     #     )
 
     return runs
+
+
+def combine_results(resultsss, out_file=None):
+    """
+    Combine analysis `resultss` from multiple runs, keeping the means
+    and uncertainties from each run.
+
+    :param resultsss: Sequence of `resultss` (2D DataFrame of results).
+    :param out_file: Where to save the compiled means and uncertainties.
+    :return: DataFrame of compiled means and uncertainties.
+    """
+    # Combine pandas Series as rows.
+    combined = pandas.concat(
+        (_clean_resultss(resultss) for resultss in resultsss),
+        axis=1
+    ).T
+
+    # Fill in defaults.
+    combined.fillna({
+            'plates': '(8, 4)',
+            'tubes_angle': 0,
+            'beam_shift': 0,
+            'tube_shift': 0
+        }, inplace=True)
+
+    if out_file:
+        calc.save_dataframe(combined, out_file)
+    return combined
+
+
+def _clean_resultss(resultss, info=None):
+    """Keep the means and uncertainties of a run's `resultss`, collapse
+    them to one row, and add entries for the run's `info`.
+
+    :type resultss: pandas.DataFrame
+    :type info: dict
+    :rtype: pandas.Series
+    """
+    # The row `tags` for the means and uncertainties.
+    stats_rows = ('mean', 'std_dev', 'std_err')
+
+    # Keep the means and uncertainties of these results. The means and
+    # uncertainties will be combined and put on a single row.
+    numbers_columns = ['middle_e_dep', 'tube_e_dep', 'full_e_dep']
+
+    run_name = resultss['run'].iloc[0]
+
+    if not info:
+        info = Run.name2info(run_name)
+
+    # Keep only the mean, standard deviation, and standard error rows.
+    keep = resultss['event'].apply(
+        lambda event: event in stats_rows
+    )
+    kept = resultss[keep]
+
+    # Collapse to a single row (pandas Series). Add prefixes.
+    clean = pandas.Series({'run_name': run_name})
+    clean = clean.append(pandas.Series(info))
+    for stat in stats_rows:
+        clean = clean.append(
+            kept[kept['event'] == stat][numbers_columns].squeeze().add_prefix(
+                stat + '_')
+        )
+
+    return clean
 
 
 def _file2name(file_path):

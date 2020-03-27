@@ -172,34 +172,39 @@ class Numbers(Calc):
     def add_data(self, data, tags=None):
         self.add_results(self._data2results(data, tags))
 
-    def append_mean_and_dev(self, mean_tags=None, std_tags=None):
+    def append_mean_and_uncertainties(
+            self, mean_tags=None, std_tags=None, sem_tags=None
+    ):
         """
-        Append mean and standard deviation entries to the collection of
-        results.
+        Append mean, standard deviation and standard error entries to
+        the collection of results.
 
         :param mean_tags: Tags to use for the new means entry.
         :type mean_tags: dict or collections.OrderedDict or None
-        :param std_tags: Tags to use for the new standard dev entry.
+        :param std_tags: Tags to use for the new standard deviation
+            entry.
         :type std_tags: dict or collections.OrderedDict or None
-        :return:
+        :param sem_tags: Tags to use for the new standard error in the
+            mean entry.
+        :type sem_tags: dict or collections.OrderedDict or None
+        :return: The new mean, standard deviation, and standard error.
         :rtype:
         """
         # Pandas' std function gives NANs for DataFrames with only one
         # entry.
         self._assert_multiple_entries()
 
-        means = self.resultss.mean()
-        stds = self.resultss.std()
+        new_rows = [self.resultss.mean(), self.resultss.std()]
+        new_rows.append(  # standard error
+            new_rows[1] / math.sqrt(len(self.resultss))
+        )
 
-        if mean_tags:
-            means = pandas.Series(mean_tags).combine_first(means)
-        if std_tags:
-            stds = pandas.Series(std_tags).combine_first(stds)
+        for i, tags in enumerate((mean_tags, std_tags, sem_tags)):
+            if tags:
+                new_rows[i] = pandas.Series(tags).combine_first(new_rows[i])
+            self.add_results(new_rows[i])
 
-        self.add_results(means)
-        self.add_results(stds)
-
-        return means, stds
+        return new_rows
 
     def _data2results(self, data, tags=None):
         """

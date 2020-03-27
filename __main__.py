@@ -1,4 +1,4 @@
-"""Handle arguments from the command line.
+"""Analyze data from the command line.
 
 This module is run when the package itself is executed in the command
 line, e.g., with the command:
@@ -6,8 +6,6 @@ line, e.g., with the command:
 """
 
 import argparse
-
-from analysis import pieces
 
 _parser = argparse.ArgumentParser()
 _parser.add_argument(
@@ -21,7 +19,7 @@ _parser.add_argument(
 _parser.add_argument(
     '-e',
     '--incident_energy',
-    help="""Sets the energy of the incident electron. '200', '200GeV', 
+    help="""Sets the energy of the incident electrons. '200', '200GeV', 
     '350', and '350GeV' are currently recognized. Case is ignored.
     """
 )
@@ -45,12 +43,17 @@ def _parse_incident_energy(incident_energy):
         return None
 
 
-_run_dirs = args.run_dirs or ['.']
+if args.run_dirs:
+    from analysis import pieces
 
-_info = {}
-if args.incident_energy:
-    _info['incident_energy'] = _parse_incident_energy(args.incident_energy)
+    _run_dirs = args.run_dirs or ['.']
 
-runs = pieces.go(args.out, *_run_dirs, info=_info)
-for run in runs:
-    print(run.numbers.resultss.tail())
+    _info = {}
+    if args.incident_energy:
+        _info['incident_energy'] = _parse_incident_energy(args.incident_energy)
+
+    runs = pieces.go(args.out, *_run_dirs, info=_info)
+    for run in runs:
+        print(run.numbers.resultss.tail())
+else:
+    print('Try adding -h or --help.')
