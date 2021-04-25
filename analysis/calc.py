@@ -16,22 +16,25 @@ from matplotlib import pyplot
 # Use seaborn's plotting styles.
 seaborn.set()
 
-# Energy-z histogram limits for the 8 by 4 plate arrangements. The
-# limits for the 7 by 7 and 6 by 6 arrangements are shifted towards
-# -z in increments of length equal to the `_plate_separation`.
-z_lims = {(8, 4): (-65, 95)}
-_plate_separation = 4 + 3.5
-for i, plates in enumerate(((7, 5), (6, 6)), start=1):
-    z_lims[plates] = tuple(
-        # Subtract multiples of the `_plate_separation` from the 8 by 4
-        # limits.
-        lim - _plate_separation * i for lim in z_lims[(8, 4)]
-    )
+# Energy-z histogram z-limits for the 8 by 4 plate arrangements. The
+# z-limits for other plate arrangements are adjusted in increments equal
+# to the `_plate_separation`.
+_z_lims_8_4 = (-65, 95)
+_plate_separation = 4.15 + 3.5
+
+# Energy-z histogram energy-limits.
+_e_lims_200 = (0, 400)  # for 200 GeV
+_e_lims_350 = (0, 650)  # for 350 GeV
+_tube_e_lims_200 = tuple(lim / 25 for lim in _e_lims_200)
+_tube_e_lims_350 = tuple(lim / 25 for lim in _e_lims_350)
 
 _default_bin_density = 10
 _default_dpi = 300
 _default_length_units = 'mm'
 _default_energy_units = 'MeV'
+
+# Just used to split energy-z plots.
+_PEEK_z_lims = (-43.5 / 2, 43.5 / 2)
 
 _default_tube_z_lims = (-35 / 2, 35 / 2)
 
@@ -39,7 +42,7 @@ _default_tube_z_lims = (-35 / 2, 35 / 2)
 # tick labels are displayed without decimals.
 _default_middle_z_lims = tuple(int(lim) for lim in (-8 / 2, 8 / 2))
 
-_default_xy_lims = 2 * ((-20 / 2, 20 / 2),)
+_default_xy_lims = 2 * ((-3, 3),)
 _default_xy_hist_z_lims = _default_middle_z_lims
 
 _image_format = 'jpg'
@@ -169,34 +172,39 @@ class Numbers(Calc):
     def add_data(self, data, tags=None):
         self.add_results(self._data2results(data, tags))
 
-    def append_mean_and_dev(self, mean_tags=None, std_tags=None):
+    def append_mean_and_uncertainties(
+            self, mean_tags=None, std_tags=None, sem_tags=None
+    ):
         """
-        Append mean and standard deviation entries to the collection of
-        results.
+        Append mean, standard deviation and standard error entries to
+        the collection of results.
 
         :param mean_tags: Tags to use for the new means entry.
         :type mean_tags: dict or collections.OrderedDict or None
-        :param std_tags: Tags to use for the new standard dev entry.
+        :param std_tags: Tags to use for the new standard deviation
+            entry.
         :type std_tags: dict or collections.OrderedDict or None
-        :return:
+        :param sem_tags: Tags to use for the new standard error in the
+            mean entry.
+        :type sem_tags: dict or collections.OrderedDict or None
+        :return: The new mean, standard deviation, and standard error.
         :rtype:
         """
         # Pandas' std function gives NANs for DataFrames with only one
         # entry.
         self._assert_multiple_entries()
 
-        means = self.resultss.mean()
-        stds = self.resultss.std()
+        new_rows = [self.resultss.mean(), self.resultss.std()]
+        new_rows.append(  # standard error
+            new_rows[1] / math.sqrt(len(self.resultss))
+        )
 
-        if mean_tags:
-            means = pandas.Series(mean_tags).combine_first(means)
-        if std_tags:
-            stds = pandas.Series(std_tags).combine_first(stds)
+        for i, tags in enumerate((mean_tags, std_tags, sem_tags)):
+            if tags:
+                new_rows[i] = pandas.Series(tags).combine_first(new_rows[i])
+            self.add_results(new_rows[i])
 
-        self.add_results(means)
-        self.add_results(stds)
-
-        return means, stds
+        return new_rows
 
     def _data2results(self, data, tags=None):
         """
@@ -215,7 +223,6 @@ class Numbers(Calc):
             new_results.update(tags)
 
         new_results.update(self.__split_z(data))
-        new_results.update(self.__tubes(data))
 
         return new_results
 
@@ -244,7 +251,7 @@ class Numbers(Calc):
         return {
             'full_e_dep':
                 data.energy_deposit.sum(),
-            'tubes_e_dep':
+            'tube_e_dep':
                 data.energy_deposit[tube_indices].sum(),
             'middle_e_dep':
                 data.energy_deposit[middle_indices].sum(),
@@ -412,23 +419,24 @@ class EnergyVsZ(Histogram):
     def __init__(
             self,
             piece,
-            e_lims,
-            tube_e_lims,
             title=None,
+            e_lims=None,
+            tube_e_lims=None,
             z_lims=None,
             tube_z_lims=None,
             middle_z_lims=None
     ):
         super().__init__(piece, title)
 
-        self.__e_lims = e_lims
-        self.__tube_e_lims = tube_e_lims
+        # Limits according to piece info.
+        self.__e_lims, self.__tube_e_lims, self.__z_lims = self.__get_lims(
+            e_lims, tube_e_lims, z_lims
+        )
 
-        # Attributes with defaults.
-        self.__z_lims = z_lims or z_lims[(8, 4)]
         self.__tube_z_lims = tube_z_lims or _default_tube_z_lims
         self.__middle_z_lims = middle_z_lims or _default_middle_z_lims
 
+        # Histogram bins.
         self.__bins = _make_bins(
             self.__z_lims[0], self.__z_lims[1], self.bin_density
         )
@@ -462,7 +470,7 @@ class EnergyVsZ(Histogram):
 
         self.__add_legend(fig, ax, ax_middle)
         if save:
-            self.save_fig(fig, file_suffix=None)
+            self.save_fig(fig, file_suffix='z')
 
     def plot_means(self, energy_label=None):
         fig, ax, ax_middle = self._make_fig_and_axes()
@@ -505,7 +513,7 @@ class EnergyVsZ(Histogram):
         )
 
         self.__add_legend(fig, ax, ax_middle)
-        self.save_fig(fig, file_suffix=None)
+        self.save_fig(fig, file_suffix='z')
 
     def plot_multi(self, energy_label=None):
         """Plot all of the events on one graph at once."""
@@ -529,7 +537,7 @@ class EnergyVsZ(Histogram):
                 kwargs2=kwargs
             )
 
-        self.save_fig(fig, file_suffix=f'{num_events}events')
+        self.save_fig(fig, file_suffix=f'z-{num_events}events')
 
     def _data2results(self, data):
         return pandas.Series(
@@ -608,7 +616,7 @@ class EnergyVsZ(Histogram):
         kwargs1 = kwargs1 or None
         kwargs2 = kwargs2 or None
 
-        inside_indices = _range2indices(x, self.__tube_z_lims)
+        inside_indices = _range2indices(x, _PEEK_z_lims)
         outside_indices = numpy.logical_not(inside_indices)
 
         plots = plot_fn(
@@ -643,6 +651,41 @@ class EnergyVsZ(Histogram):
                 horizontalalignment='center',
                 verticalalignment='center'
             )
+
+    def __get_lims(self, e_lims=None, tube_e_lims=None, z_lims=None):
+        """
+        Get the plot energy-limits for both sets of axes (full and
+        tubes) and the plot z-limits from Piece info.
+
+        The z-limits are shifted from the default 8 by 4 limits in
+        increments equal to the `_plate_separation`. Arguments passed in
+        will override the calculated limits.
+        """
+        if ('incident_energy' not in self._piece.info) \
+                or (self._piece.info['incident_energy'] == '350gev'):
+            if not e_lims:
+                e_lims = _e_lims_350
+            if not tube_e_lims:
+                tube_e_lims = _tube_e_lims_350
+        else:
+            if not e_lims:
+                e_lims = _e_lims_200
+            if not tube_e_lims:
+                tube_e_lims = _tube_e_lims_200
+
+        if not z_lims:
+            plates = self._piece.info.get('plates')
+            if (not plates) or plates == (8, 4):
+                z_lims = _z_lims_8_4
+            else:
+                z_lims = (
+                    # limit at back plate
+                    _z_lims_8_4[0] - (plates[1] - 4) * _plate_separation,
+                    # limit at front plate
+                    _z_lims_8_4[1] + (plates[0] - 8) * _plate_separation
+                )
+
+        return e_lims, tube_e_lims, z_lims
 
     @staticmethod
     def __add_legend(fig, ax, ax_middle):
@@ -747,6 +790,7 @@ class EnergyVsXY(Histogram):
 
     def _make_fig_and_axes(self):
         fig, ax = pyplot.subplots()
+        fig.tight_layout(rect=(0, 0, 1, 0.86))
 
         ax.set_xlabel(f'x ({self.length_units})')
         ax.set_ylabel(f'y ({self.length_units})')

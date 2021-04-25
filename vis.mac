@@ -16,7 +16,8 @@
 /vis/viewer/set/viewpointThetaPhi 0. 90.
 #
 # Draw coordinate axes:
-/vis/scene/add/axes 0 0 0 450 mm
+# /vis/scene/add/axes 0 0 0 450 mm
+/vis/scene/add/axes 0 0 0 10 m auto false
 #
 # Draw smooth trajectories at end of event, showing trajectory points
 # as markers 2 pixels wide:

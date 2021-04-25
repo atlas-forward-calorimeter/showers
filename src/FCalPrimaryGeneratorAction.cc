@@ -31,6 +31,8 @@ FCalPrimaryGeneratorAction::FCalPrimaryGeneratorAction()
     // Initialize particle parameters.
     fParticleGun->SetParticleDefinition(particle);
     fParticleGun->SetParticleEnergy(350. * GeV);
+
+    // Straight down z-axis towards -z.
     fParticleGun->SetParticleMomentumDirection(G4ThreeVector(0., 0., -1.));
 }
 
@@ -42,21 +44,15 @@ FCalPrimaryGeneratorAction::~FCalPrimaryGeneratorAction()
 
 void FCalPrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent)
 {
-    G4double tubtriside = 7.5 * CLHEP::mm;
-
-    // Center of the "upper right" (+x and +y) tube.
-    G4ThreeVector offset = G4ThreeVector(
-        tubtriside / 4 * 3, tubtriside / 4 * sqrt(3), 0);
-
     // Sets `offset` to the 0 vector for a centered beam.
-    // offset = G4ThreeVector();  
+    G4ThreeVector offset = G4ThreeVector();
 
-    G4ThreeVector position = G4ThreeVector(
-        G4RandGauss::shoot(0, 0.03) * CLHEP::cm,
-        G4RandGauss::shoot(0, 0.03) * CLHEP::cm,
-        20.0 * CLHEP::cm
+    G4ThreeVector position = offset + G4ThreeVector(
+        G4RandGauss::shoot(0, 0.3) * CLHEP::mm,
+        G4RandGauss::shoot(0, 0.3) * CLHEP::mm,
+        200 * CLHEP::mm
     );
 
-    fParticleGun->SetParticlePosition(position + offset);
+    fParticleGun->SetParticlePosition(position);
     fParticleGun->GeneratePrimaryVertex(anEvent);
 }
