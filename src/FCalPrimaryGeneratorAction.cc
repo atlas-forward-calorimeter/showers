@@ -30,9 +30,12 @@ FCalPrimaryGeneratorAction::FCalPrimaryGeneratorAction()
 
     // Initialize particle parameters.
     fParticleGun->SetParticleDefinition(particle);
-    fParticleGun->SetParticleEnergy(200. * GeV);
+    fParticleGun->SetParticleEnergy(350. * GeV);
+
+    // Straight down z-axis towards -z.
     fParticleGun->SetParticleMomentumDirection(G4ThreeVector(0., 0., -1.));
 }
+
 
 //// Destructor
 FCalPrimaryGeneratorAction::~FCalPrimaryGeneratorAction()
@@ -40,13 +43,18 @@ FCalPrimaryGeneratorAction::~FCalPrimaryGeneratorAction()
   delete fParticleGun;
 }
 
+
 void FCalPrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent)
 {
-    fParticleGun->SetParticlePosition(G4ThreeVector(
-        G4RandGauss::shoot(0, 0.03) * CLHEP::cm,
-        G4RandGauss::shoot(0, 0.03) * CLHEP::cm,
-        20.0 * CLHEP::cm
-    ));
+    // Sets `offset` to the 0 vector for a centered beam.
+    G4ThreeVector offset = G4ThreeVector(3.5, 0, 0) * CLHEP::mm;
 
+    G4ThreeVector position = offset + G4ThreeVector(
+        G4RandGauss::shoot(0, 0.3) * CLHEP::mm,
+        G4RandGauss::shoot(0, 0.3) * CLHEP::mm,
+        200 * CLHEP::mm
+    );
+
+    fParticleGun->SetParticlePosition(position);
     fParticleGun->GeneratePrimaryVertex(anEvent);
 }

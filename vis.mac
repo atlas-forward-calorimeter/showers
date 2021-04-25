@@ -1,39 +1,75 @@
-# 
-# Macro file for visulization
-#
-# Use this open statement to create an OpenGL view:
-/vis/open OGL 600x600-0+0
-#
-# Disable auto refresh and quieten vis messages whilst scene and
-# trajectories are established:
-/vis/viewer/set/autoRefresh false
-/vis/verbose errors
-#
-# Draw geometry:
+# ----------------
+# Verbose settings
+# ----------------
+/control/verbose 2
+/run/verbose 2
+
+#/tracking/verbose 2
+
+# HepRepFile diriver
+#/vis/open HepRepXML
+
+# OpenGL driver
+/vis/open OGL 600x400
+#/vis/open OGL 3840x2160
+
+
+# qt driver
+#/vis/open qt
+
+# Add world volume
 /vis/drawVolume
+
+# Visualise geometry
+/vis/viewer/flush
+
+# Set camera angle for OGLIX driver
+/vis/viewer/zoom 1.5
+/vis/viewer/set/viewpointThetaPhi 91 178
+/vis/viewer/set/viewpointThetaPhi 45 45
+
+# Add trajectories to the visualization.
+/vis/scene/add/trajectories
+
+# Accumulate multiple events in one picture.
+/vis/scene/endOfEventAction accumulate -1
+
+# Trajectory colouring scheme
+/vis/modeling/trajectories/create/drawByParticleID
+#/vis/modeling/trajectories/create/drawByCharge
+#/vis/modeling/trajectories/drawByCharge-0/set -1 red
+#/vis/modeling/trajectories/drawByCharge-0/set 1 blue
+#/vis/modeling/trajectories/drawByCharge-0/set 0 white
+
+# # To draw neutrinos only
+#/vis/filtering/trajectories/create/particleFilter
+#/vis/filtering/trajectories/particleFilter-0/add gamma
+# /vis/filtering/trajectories/particleFilter-0/add anti_nu_e
+# /vis/filtering/trajectories/particleFilter-0/add nu_e
+# #
+# # To not draw neutrinos
+#/vis/filtering/trajectories/particleFilter-0/invert true
+
+# To draw neutrins and gammas only
+#/vis/filtering/trajectories/create/particleFilter
+#/vis/filtering/trajectories/particleFilter-0/add gamma
+#/vis/filtering/trajectories/particleFilter-0/add neutron
+
+#/gun/particle ion
+#/gun/ion 95 241
+
+/run/initialize
 #
-# Specify view angle:
-/vis/viewer/set/viewpointThetaPhi 0. 90.
-#
-# Draw coordinate axes:
-/vis/scene/add/axes 0 0 0 450 mm
-#
-# Draw smooth trajectories at end of event, showing trajectory points
-# as markers 2 pixels wide:
-/vis/scene/add/trajectories smooth
-/vis/modeling/trajectories/create/drawByCharge
-/vis/modeling/trajectories/drawByCharge-0/default/setDrawStepPts true
-/vis/modeling/trajectories/drawByCharge-0/default/setStepPtsSize 2
-# (if too many tracks cause core dump => /tracking/storeTrajectory 0)
-#
-# Re-establish auto refreshing and verbosity:
-/vis/viewer/set/autoRefresh true
-/vis/verbose warnings
-#
-# Set visualization to accumulate events into one picture
-#
-/vis/scene/endOfEventAction accumulate
-#
-#Disbale world and envelop view
-/vis/geometry/set/visibility logicalWorld 0 false
-/vis/geometry/set/visibility logicalEnv 0 false
+/process/list
+/run/setCut 0.001 mm
+#/process/eLoss/StepFunction 0.1 10 um
+#/vis/disable
+#/run/beamOn 100000000
+#/run/beamOn 10000000
+#/run/beamOn 1000
+#/run/beamOn 10
+
+# Create logo
+/run/beamOn 100
+/vis/viewer/set/viewpointThetaPhi 0 0
+/vis/viewer/zoom 2

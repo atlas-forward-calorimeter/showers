@@ -1,4 +1,4 @@
-# A normal run, one beta per event.
+# A normal set of runs.
 
 /process/em/verbose 0  # Verbosity.
 
