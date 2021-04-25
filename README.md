@@ -16,7 +16,11 @@
 - The energy of the electron and the spread of the beam can also be edited in src/FCalPrimaryGeneratorAction.cc.
 - The source of the electrons can be switched between the external beam and the hot foil inside the electrodes by editing the file src/FCalActionalInitialization.cc.
 
-Maxwell's original documentation is below:
+## Editing the Output
+
+- The process of writing the data to files is handled in src/FCalEventAction.cc. The type of data and what format it is written out in can be controlled by editing this file.
+
+### Maxwell's original documentation is below:
 
 # Detailed simulation of Forward Calorimeter Layer 1 ]
 - Author: Zhaoyuan "Maxwell" Cui
