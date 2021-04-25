@@ -1,4 +1,24 @@
 # Detailed simulation of Forward Calorimeter Layer 1 
+- Edited by Anson Kost, with the help of [Prof. John Rutherfoord](https://w3.physics.arizona.edu/people/john-rutherfoord)
+- Author: Zhaoyuan "Maxwell" Cui, Advisor: [Prof. Erich Varnes](http://w3.physics.arizona.edu/people/erich-varnes)
+- Physics Department, University of Arizona
+
+## Running the Simulation
+
+1. Build the program in a folder of your choice (see Maxwell's instructions below or the [Geant4 Book for Application Developers](https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/GettingStarted/makeFile.html)).
+2. If you want to save data to files, then create a folder named "data".
+3. In the parent folder of the data folder, enter the following command in the terminal (while in the parent of the data folder): `</path/to/FCal> </path/to/runBetas.mac>`. Here, `<path/to/FCal>` is the (relative) path to the FCal program in the build directory, and `</path/to/runBetas.mac>` is the (relative) path to the runBetas.mac script included in this repository.
+4. Rename the "data" folder to save the data, and create a new, empty folder named "data" for the next run.
+
+## Editing the Simulation
+
+- To control the x and y offset of the position of the electron beam, edit the `offset` variable in src/FCalPrimaryGeneratorAction.cc.
+- The energy of the electron and the spread of the beam can also be edited in src/FCalPrimaryGeneratorAction.cc.
+- The source of the electrons can be switched between the external beam and the hot foil inside the electrodes by editing the file src/FCalActionalInitialization.cc.
+
+Maxwell's original documentation is below:
+
+# Detailed simulation of Forward Calorimeter Layer 1 ]
 - Author: Zhaoyuan "Maxwell" Cui
 - Advisor: Prof. [Erich Varnes](http://w3.physics.arizona.edu/people/erich-varnes)
 - Physics Department, University of Arizona
