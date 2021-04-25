@@ -46,10 +46,10 @@ FCalPrimaryGeneratorAction::~FCalPrimaryGeneratorAction()
 
 void FCalPrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent)
 {
-    // Sets `offset` to the 0 vector for a centered beam.
-    G4ThreeVector offset = G4ThreeVector(3.5, 0, 0) * CLHEP::mm;
+    // Control the x and y offset of the electron beam. Set to (0, 0, 0) for a centered beam.
+    G4ThreeVector offset = G4ThreeVector(0, 0, 0) * CLHEP::mm;
 
-    G4ThreeVector position = offset + G4ThreeVector(
+    G4ThreeVector position = offset + G4ThreeVector(  // 0.3 mm beam spread
         G4RandGauss::shoot(0, 0.3) * CLHEP::mm,
         G4RandGauss::shoot(0, 0.3) * CLHEP::mm,
         200 * CLHEP::mm
