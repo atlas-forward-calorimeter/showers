@@ -5,20 +5,23 @@
 
 ## Running the Simulation
 
-1. Build the program in a folder of your choice (see Maxwell's instructions below or the [Geant4 Book for Application Developers](https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/GettingStarted/makeFile.html)).
-2. If you want to save data to files, then create a folder named "data".
-3. In the parent folder of the data folder, enter the following command in the terminal (while in the parent of the data folder): `</path/to/FCal> </path/to/runBetas.mac>`. Here, `<path/to/FCal>` is the (relative) path to the FCal program in the build directory, and `</path/to/runBetas.mac>` is the (relative) path to the runBetas.mac script included in this repository.
-4. Rename the "data" folder to save the data, and create a new, empty folder named "data" for the next run.
+1. Source the Geant4 environment variables script with the command `. /home/ansonturtle/bin/vars.sh`.
+2. Build the program in a folder of your choice (see Maxwell's instructions below or the [Geant4 Book for Application Developers](https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/GettingStarted/makeFile.html)).
+3. If you want to save data to files, then create a folder named "data".
+4. In the parent folder of the data folder, enter the following command in the terminal (while in the parent of the data folder): `</path/to/FCal> </path/to/runBetas.mac>`. Here, `<path/to/FCal>` is the (relative) path to the FCal program in the build directory, and `</path/to/runBetas.mac>` is the (relative) path to the runBetas.mac script included in this repository.
+5. Rename the "data" folder to save the data, and create a new, empty folder named "data" for the next run.
 
 ## Editing the Simulation
 
 - To control the x and y offset of the position of the electron beam, edit the `offset` variable in src/FCalPrimaryGeneratorAction.cc.
 - The energy of the electron and the spread of the beam can also be edited in src/FCalPrimaryGeneratorAction.cc.
 - The source of the electrons can be switched between the external beam and the hot foil inside the electrodes by editing the file src/FCalActionalInitialization.cc.
+- Rebuild the program for changes to take effect.
 
 ## Editing the Output
 
 - The process of writing the data to files is handled in src/FCalEventAction.cc. The type of data and what format it is written out in can be controlled by editing this file.
+- Rebuild the program for changes to take effect.
 
 ### Maxwell's original documentation is below:
 
